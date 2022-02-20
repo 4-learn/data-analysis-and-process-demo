@@ -24,7 +24,7 @@ for index in range(counts_buy):
     selected = selected.loc[df['Shape'] == list_order[index]["shape"]]
     list_selected.append(selected)
 
-# 列印出總價
-print("你的購物清單為:")
+# 印出可購買的清單
+print("你目可購買的清單為:")
 result = pd.concat(list_selected)
 print(result)
