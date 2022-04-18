@@ -25,6 +25,6 @@ for index in range(counts_buy):
     list_selected.append(selected)
 
 # 印出可購買的清單
-print("你目可購買的清單為:")
+print("適合您的商品清單為:")
 result = pd.concat(list_selected)
 print(result)
