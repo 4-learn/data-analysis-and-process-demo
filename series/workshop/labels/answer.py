@@ -10,7 +10,6 @@ for obj in list_input:
     else:
         list_type.append("str")
 
-
 myvar = pd.Series(list_input, index = list_type)
 value = input("請輸入你要查詢的型態: ")
 
