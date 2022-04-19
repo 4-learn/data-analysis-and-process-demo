@@ -5,6 +5,7 @@ df = pd.read_csv('data.csv')
 sum_math = 0
 counts_math = 0
 
+# 先算出英文，數學平均值
 sum_english = 0
 counts_english = 0
 for x in df.index:
@@ -19,6 +20,7 @@ for x in df.index:
 avg_math = sum_math/counts_math
 avg_english = sum_english/counts_english
 
+# 小於平均值得，一律重新賦值
 for x in df.index:
     if df.loc[x, "Math"] < 60:
         df.loc[x, "Math"] = avg_math
