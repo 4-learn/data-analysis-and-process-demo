@@ -14,5 +14,7 @@ print("---")
 for x in b:  
     print (x)
 
-# 因為 np.nditer return 是一個 reference
-# 所以如果 a 有意動，b 就會跟著異動
+# 原因
+# a 為 ndarray ( mutable object )
+# 當 mutable 物件被傳遞到 b class 屬性時，
+# 所以如果 a 有異動，b 就會跟著異動
