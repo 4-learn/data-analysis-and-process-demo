@@ -16,7 +16,7 @@ print(type(df))
 print(df) 
 print("---\n")
 
-print("3. Series 轉 DataFrame")
+print("3. 將 Dict 轉 DataFrame")
 df = pd.DataFrame(data)
 print(type(df))
 print(df) 
