@@ -15,8 +15,5 @@ print(df)
 
 # 請輸入你要顯示的 index 個數
 counts_index = int(input("請輸入你要顯示的 index 個數: "))
-list_counts = []
-for index in range(counts_index):
-    list_counts.append(index) 
 
-print(df.loc[ list_counts ])
+print(df.loc[ 0:counts_index-1 ])
