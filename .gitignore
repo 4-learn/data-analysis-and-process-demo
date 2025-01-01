@@ -1,0 +1,82 @@
+# Python bytecode files
+*.pyc
+*.pyo
+__pycache__/
+
+# Distribution / packaging
+*.egg
+*.egg-info/
+dist/
+build/
+*.tar.gz
+*.whl
+
+# Virtual environments
+venv/
+env/
+ENV/
+*.env
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyCharm
+.idea/
+
+# VSCode
+.vscode/
+
+# MyPy
+.mypy_cache/
+
+# Pytest
+.cache/
+
+# Coverage reports
+.coverage
+coverage.xml
+*.cover
+*.hypothesis/
+
+# Django
+*.log
+*.pot
+*.pyc
+__pycache__/
+db.sqlite3
+media/
+staticfiles/
+
+# Flask
+instance/
+.webassets-cache
+
+# Environment-specific files
+*.db
+*.sqlite3
+
+# Local settings (e.g. database, config files, etc.)
+*.local
+
+# IDE/Editor files
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# macOS specific
+.DS_Store
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+
+# PyInstaller
+*.spec
+
+# Sphinx
+docs/_build/
+
+# Pycharm specific
+.idea/
+
