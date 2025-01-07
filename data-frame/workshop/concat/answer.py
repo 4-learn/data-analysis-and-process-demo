@@ -20,6 +20,6 @@ Output DataFrame:
 Name: id, dtype: object
 
 因為 concat 只連接 2 個 DataFrame，
-不會新排序 index
+不會重新排序 index
 """
 
