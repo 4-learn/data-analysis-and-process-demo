@@ -1,5 +1,0 @@
-import numpy as np 
- 
-s =  b'Hello World' 
-a = np.frombuffer(s, dtype =  'S1')  
-print (a)
