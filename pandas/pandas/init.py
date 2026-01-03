@@ -1,9 +1,9 @@
 import pandas as pd
 
-data = {
-    "event_id": [101, 102, 103],
-    "confidence": [0.9, 0.6, 0.3]
+mydataset = {
+    "cars": ["BMW", "Volvo", "Ford"],
+    "passings": [3, 7, 2]
 }
 
-df = pd.DataFrame(data)
+df = pd.DataFrame(mydataset)
 print(df)
