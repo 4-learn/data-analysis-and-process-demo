@@ -1,0 +1,36 @@
+## pandas 3.0.6
+python 3.11.14 pandas 3.0.6 mariadb 1.1.14 paramstyle qmark
+server 11.8.9-MariaDB-ubu2404
+loaded 749
+rows 15 warnings [('UserWarning', 'pandas only supports SQLAlchemy connectable (engine/connecti'), ('UserWarning', 'pandas only supports SQLAlchemy connectable (engine/connecti')]
+%s rows 15
+dtypes {'fetched_at': 'datetime64[us]', 'avg_len': 'float64', 'len_b': 'int64', 'len_c': 'int64', 'pipes': 'int64'}
+values {'fetched_at': Timestamp('2026-10-05 04:05:23'), 'avg_len': 159.2737, 'len_b': 6, 'len_c': 2, 'pipes': 0}
+coerce_float=False object Decimal
+driver types datetime Decimal
+error type mariadb.ProgrammingError | is pd DatabaseError: False | is mariadb.Error: True
+inject concat 749 params 0
+find 墜落 15
+find % 189
+naive inject 190
+naive quote err mariadb.ProgrammingError
+LENGTH equals False max 2455 | CHAR_LENGTH equals True max 935 dtypes int64 int64
+LIKE collation 墜落 vs ascii case: 0 0
+## pandas 2.3.3
+python 3.11.14 pandas 2.3.3 mariadb 1.1.14 paramstyle qmark
+server 11.8.9-MariaDB-ubu2404
+loaded 749
+rows 15 warnings [('UserWarning', 'pandas only supports SQLAlchemy connectable (engine/connecti'), ('UserWarning', 'pandas only supports SQLAlchemy connectable (engine/connecti')]
+%s rows 15
+dtypes {'fetched_at': 'datetime64[ns]', 'avg_len': 'float64', 'len_b': 'int64', 'len_c': 'int64', 'pipes': 'int64'}
+values {'fetched_at': Timestamp('2026-10-05 04:05:23'), 'avg_len': 159.2737, 'len_b': 6, 'len_c': 2, 'pipes': 0}
+coerce_float=False object Decimal
+driver types datetime Decimal
+error type pandas.errors.DatabaseError | is pd DatabaseError: True | is mariadb.Error: False
+inject concat 749 params 0
+find 墜落 15
+find % 189
+naive inject 190
+naive quote err pandas.errors.DatabaseError
+LENGTH equals False max 2455 | CHAR_LENGTH equals True max 935 dtypes int64 int64
+LIKE collation 墜落 vs ascii case: 0 0

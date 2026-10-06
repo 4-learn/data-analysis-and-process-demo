@@ -164,7 +164,7 @@ groupby 預設 728 列；dropna=False 749 列
 
 - **`COUNT(*)` → `int64`**。沒問題。
 - **`SUM(CASE WHEN chapter = '' THEN 1 END)` → `float64`**。這欄本來是「沒有分章的條數」，是整數；但 9 部法規裡有 8 部算出來是 `NULL`（`SUM` 對全是 `NULL` 的組回 `NULL`，不是 0），pandas 只好把 `NULL` 變 `NaN`，整欄就變成浮點數。**跟第 02 節「空欄變 `float64`」是同一件事，只是這次是 SQL 造成的。** 要 0 就在 SQL 寫 `COALESCE(SUM(...), 0)` 或 `COUNT(CASE ...)`。
-- **`fetched_at` → `str`**。SQLite 沒有日期型別，存什麼就讀回什麼。換到 MariaDB，`fetched_at` 是 `DATETIME`，驅動會交出 Python `datetime`，pandas 讀成 `datetime64`——而且**沒有時區**（MariaDB 的 `DATETIME` 不含時區資訊，依官方文件）。爬蟲課第 16 節要求的「ISO 8601 帶時區」，寫進 `DATETIME` 那一刻就沒了。這一點本節沒有在 MariaDB 上實測，見第六段。
+- **`fetched_at` → `str`**。SQLite 沒有日期型別，存什麼就讀回什麼。換到 MariaDB，`fetched_at` 是 `DATETIME`，驅動會交出 Python `datetime`，pandas 讀成 `datetime64`——而且**沒有時區**（MariaDB 的 `DATETIME` 不含時區資訊）。爬蟲課第 16 節要求的「ISO 8601 帶時區」，寫進 `DATETIME` 那一刻就沒了——讀回來的只是一個不知道是哪個時區的時間。MariaDB 實測見第六段。
 - **空字串 vs `NULL`**：`chapter` 在表裡是 `NOT NULL DEFAULT ''`，大量解僱勞工保護法的 21 條是**空字串**，讀進來還是空字串。但只要有人在 SQL 裡寫了 `NULLIF(chapter, '')`（或者上游把空值存成 `NULL`），進 pandas 就變成 `NaN`，而 **`groupby` 預設把 `NaN` 那一組整個丟掉**：749 列變 728 列，沒有任何警告。`dropna=False` 才拿得回來。SQL 的 `GROUP BY` 會保留 `NULL` 那一組——**同一份資料，SQL 和 pandas 在這裡給的答案不一樣**。
 - **查無資料**：參數查不到任何列時，`n` 是 `object` 而不是 `int64`——沒有任何一個值可以讓 pandas 推斷型別，SQLite 也不會告訴它「這欄應該是整數」。下游若寫 `df["n"].sum()` 不會出錯，但若拿去跟另一張表 `concat`，型別會被拖垮。**查無資料要當成一種要處理的結果，不是「空的就算了」。**
 
@@ -308,10 +308,10 @@ python3 04_sql_or_pandas.py
 
 ## 六、換成 MariaDB 時要改什麼
 
-教室有 MariaDB 時，連線沿用 MariaDB 課第 10、13 節（受限帳號、設定檔不進版控、`closing()` 管理生命週期），本節不重教。**以下這段本節測試不涵蓋**，也沒有在本機的 MariaDB 上實際執行（本環境沒有 MariaDB 伺服器與 `mariadb` 驅動）；能驗證的部分已分別標出驗證方式。
+教室有 MariaDB 時，連線沿用 MariaDB 課第 10、13 節（受限帳號、設定檔不進版控、`closing()` 管理生命週期），本節不重教。**以下這段本節的 pytest 不涵蓋**（測試不需要資料庫）；教師另於 2026-10-06 以 MariaDB 11.8.9＋`mariadb` 1.1.14（Python 3.11、pandas 3.0.6 與 2.3.3 各一次）實跑，載入同樣 749 條，下表「怎麼確認的」欄的結果都來自這次實跑。重跑方式：`bash tools/mariadb-04/run.sh`（需要 docker），紀錄在 `tools/mariadb-04/evidence.txt`。
 
 ```python
-# 本節測試不涵蓋這段：需要 MariaDB 伺服器與 mariadb==1.1.14（MariaDB 課第 10 節）
+# 需要 MariaDB 伺服器與 mariadb==1.1.14（MariaDB 課第 10 節）；N0060014 含「墜落」實測 15 列，與 SQLite 版相同
 import warnings
 from contextlib import closing
 
@@ -331,13 +331,13 @@ with closing(mariadb.connect(user=..., password=..., database=..., unix_socket=.
 
 | 項目 | SQLite（本節 Demo） | MariaDB Connector/Python | 怎麼確認的 |
 | --- | --- | --- | --- |
-| 佔位符 | `?` | **`?`**（`paramstyle = 'qmark'`）；`%s` 也接受 | `mariadb` 1.1.14 原始碼 `mariadb/dbapi20.py` 寫 `paramstyle = 'qmark'`，`cursors.py` 另有 FORMAT／PYFORMAT 的處理；MariaDB 課第 11 節、爬蟲課第 16 節皆以 `?` 實測。sqlite3 用 `%s` 實測會報語法錯誤 |
-| `read_sql` 會不會警告 | 不會 | **每次呼叫都發 `UserWarning`**：`pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.` | 讀 pandas 3.0.6 `pandas/io/sql.py` 的 `pandasSQL_builder()`：只有 `sqlite3.Connection`、SQLAlchemy、ADBC 不警告，其他 DBAPI 物件一律警告後**照 sqlite3 的方式執行**。另用一個不是 `sqlite3.Connection` 的假 DBAPI 物件實測，3.0.6 與 2.3.3 都發出、查詢結果正確 |
-| 查詢失敗時的例外 | `pandas.errors.DatabaseError` | **pandas 3.0.6：驅動自己的例外原樣拋出**（例如 `mariadb.ProgrammingError`），pandas **不會**替你 `rollback`；2.3.3：包成 `pandas.errors.DatabaseError` 並呼叫一次 `con.rollback()` | 讀原始碼：3.0.6 的 `SQLiteDatabase.execute()` 只捕捉 `sqlite3.Error`，2.3.3 捕捉所有 `Exception`。用假 DBAPI 物件實測：3.0.6 拋原本的例外、`rollback` 0 次；2.3.3 拋 `DatabaseError`、`rollback` 1 次 |
-| `DATETIME` 欄 | `TEXT`，讀回字串 | 驅動交出 `datetime`，pandas 讀成無時區的 `datetime64[us]`（2.3.3 是 `[ns]`） | pandas 這一半用假物件實測；**驅動會交出 `datetime` 未實測**（依 PEP 249 推論） |
-| `AVG()`、`DECIMAL` 欄 | `float64` | 驅動交出 `Decimal`；`read_sql` 預設 `coerce_float=True` 會轉成 `float64`，設 `False` 則留在 `object` | pandas 這一半用假物件實測；驅動回 `Decimal` 未實測 |
-| `LENGTH()` | 字元數（`'墜落'` → 2） | **位元組數**（utf8mb4 中文一字 3 位元組）；要字元數用 `CHAR_LENGTH()` | SQLite 實測；MariaDB 依官方文件，未實測 |
-| `||` | 字串串接 | 預設是 `OR` | MariaDB 官方文件，未實測 |
+| 佔位符 | `?` | **`?`**（`paramstyle = 'qmark'`）；`%s` 也接受 | MariaDB 實測：`mariadb.paramstyle` 為 `qmark`；`?` 與 `%s` 兩種寫法都回 15 列。sqlite3 用 `%s` 實測會報語法錯誤 |
+| `read_sql` 會不會警告 | 不會 | **每次呼叫都發 `UserWarning`**：`pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.` | MariaDB 實測：連續兩次 `read_sql` 各發一次，3.0.6 與 2.3.3 相同。原因在 pandas `pandasSQL_builder()`：只有 `sqlite3.Connection`、SQLAlchemy、ADBC 不警告，其他 DBAPI 物件一律警告後照 sqlite3 的方式執行 |
+| 查詢失敗時的例外 | `pandas.errors.DatabaseError` | **pandas 3.0.6：驅動自己的例外原樣拋出**（例如 `mariadb.ProgrammingError`），pandas **不會**替你 `rollback`；2.3.3：包成 `pandas.errors.DatabaseError` 並呼叫一次 `con.rollback()` | MariaDB 實測（查不存在的欄位）：3.0.6 拋 `mariadb.ProgrammingError`，`isinstance(e, pd.errors.DatabaseError)` 為 `False`；2.3.3 拋 `pandas.errors.DatabaseError`，`isinstance(e, mariadb.Error)` 為 `False`。`rollback` 次數以假 DBAPI 物件實測（3.0.6 0 次、2.3.3 1 次），原因是 3.0.6 的 `SQLiteDatabase.execute()` 只捕捉 `sqlite3.Error` |
+| `DATETIME` 欄 | `TEXT`，讀回字串 | 驅動交出 `datetime`，pandas 讀成無時區的 `datetime64[us]`（2.3.3 是 `[ns]`） | MariaDB 實測：cursor 取回 `datetime`；`read_sql` 讀成 `datetime64[us]`（2.3.3 `[ns]`），值 `2026-10-05 04:05:23`，不帶時區（實測時以 UTC 寫入；讀回後無從得知原本是哪個時區） |
+| `AVG()`、`DECIMAL` 欄 | `float64` | 驅動交出 `Decimal`；`read_sql` 預設 `coerce_float=True` 會轉成 `float64`，設 `False` 則留在 `object` | MariaDB 實測：cursor 取回 `Decimal`；`read_sql` 預設得 `float64`，`coerce_float=False` 得 `object`（內容是 `Decimal`） |
+| `LENGTH()` | 字元數（`'墜落'` → 2） | **位元組數**（utf8mb4 中文一字 3 位元組）；要字元數用 `CHAR_LENGTH()` | MariaDB 實測：`LENGTH('墜落')` 為 6、`CHAR_LENGTH('墜落')` 為 2 |
+| `||` | 字串串接 | 預設是 `OR` | MariaDB 實測：`'a' || 'b'` 得 `0`（整數），不是 `'ab'`，也沒有錯誤 |
 
 三個實際影響：
 
@@ -368,13 +368,13 @@ with closing(mariadb.connect(user=..., password=..., database=..., unix_socket=.
 ### 參考判讀
 
 - 一題兩解（教師實測）：SQL `SELECT pcode, MAX(LENGTH(content)) AS max_len FROM law_articles GROUP BY pcode ORDER BY pcode` 與 pandas `content.str.len()` 後 `groupby("pcode", as_index=False)["max_len"].max()`，`equals` 為 `True`，兩邊 `max_len` 都是 `int64`。最長的是 `N0060014` 的 935 字，與第 16 節「本資料最長一條 935 字」一致。
-  - **換到 MariaDB 會出錯**：`LENGTH()` 在 MariaDB 是位元組數，中文條文會變成約 3 倍，`equals` 變 `False`。要改成 `CHAR_LENGTH()`。（MariaDB 依官方文件，未在本機實測。）這正是「用一邊驗證另一邊」抓得到的錯。
+  - **換到 MariaDB 會出錯**：`LENGTH()` 在 MariaDB 是位元組數，中文條文會變成約 3 倍，`equals` 變 `False`。要改成 `CHAR_LENGTH()`。（MariaDB 實測：`LENGTH` 版最大值 2455，`equals` 為 `False`；換 `CHAR_LENGTH` 後最大值 935、`equals` 為 `True`。）這正是「用一邊驗證另一邊」抓得到的錯。
   - 選擇：這題兩邊都很短。資料在資料庫、只要結果，用 SQL；若接下來還要跟 CSV 合併或做驗證，拉進 pandas。理由說得出來就算對。
 - `NULL` 這一組（教師實測）：SQL `GROUP BY pcode, chapter` 回 76 組、合計 749 條；pandas `groupby(["pcode", "chapter"])` 預設回 75 組、合計 728 條，`dropna=False` 才是 76 組、749 條。少掉的 21 條就是大量解僱勞工保護法——沒有分章，不是不存在。
 - 抓 AI 的錯：
   - 字串拼接版：惡意輸入回 190 列、帶引號輸入拋 `DatabaseError`（Demo 第四段實測）。
   - 寫成 `LIKE '%?%'`：參數個數對不上，SQLite 報錯（教師實測）；如果它只傳一個參數，則 `'%?%'` 是在找含問號的條文，回 0 列——**不報錯，只是找不到**。
-  - 寫成 `'%' || ? || '%'`：在 SQLite 正確，到 MariaDB 預設變成 `OR`（依官方文件）。
+  - 寫成 `'%' || ? || '%'`：在 SQLite 正確，到 MariaDB 預設變成 `OR`（實測 `'a' || 'b'` 得 `0`，不報錯）。
   - `keyword="%"`：參數化版本回 189 列（教師實測）。參數化擋住的是 SQL 注入，不是 `LIKE` 萬用字元。
 
 ### 驗收
@@ -390,7 +390,7 @@ with closing(mariadb.connect(user=..., password=..., database=..., unix_socket=.
 
 **pandas 版本差異（非 Demo 輸出，教師以假 DBAPI 物件與原始碼確認）**：非 sqlite3 連線的 `UserWarning` 在 3.0.6 與 2.3.3 訊息相同；查詢失敗時 3.0.6 拋驅動原本的例外、不 `rollback`，2.3.3 包成 `pandas.errors.DatabaseError` 並 `rollback` 一次。這會影響學生的 `except` 寫法，**若教室退回 pandas 2.3，第六段第 2 點要改寫**。
 
-**MariaDB 部分的證據等級**：第六段的 MariaDB 程式碼**待驗證**——本環境沒有 MariaDB 伺服器、沒有 `mariadb` 驅動、也沒有 SQLAlchemy。`paramstyle = 'qmark'` 依 `mariadb-connector-python` v1.1.14 原始碼（2026-10-05 查閱）；`LENGTH` 為位元組數、`||` 預設為 `OR` 依 MariaDB 官方文件（2026-10-05 查閱）；`?` 佔位在 MariaDB 課第 11 節、爬蟲課第 16 節有實測紀錄。開課前應在教室 VM 上實跑一次第六段並補上實測輸出。
+**MariaDB 部分的證據等級**：第六段的宣稱已於 2026-10-06 在 MariaDB 11.8.9（官方 `mariadb:11.8` 映像）＋`mariadb` 1.1.14 上實跑：`find_articles` 15 列、`keyword="%"` 189 列、字串拼接惡意輸入 190 列、帶引號輸入的例外型別（3.0.6 `mariadb.ProgrammingError`／2.3.3 `pandas.errors.DatabaseError`），皆與 SQLite 版一致或如表所述；紀錄與重跑腳本在 `tools/mariadb-04/`。**尚未在教室 VM 上跑過**——VM 的 MariaDB 版本、帳號權限、`unix_socket` 設定若不同，開課前仍應跑一次 `run.sh` 的等價步驟。`rollback` 次數一項只以假 DBAPI 物件驗證。
 
 **資料**：資料表結構取自爬蟲課第 16 節 `law_articles`（欄位、`NOT NULL`、`DEFAULT ''`、`UNIQUE (pcode, slug)` 相同；型別改為 SQLite 的 `TEXT`／`INTEGER`）。內容為 `data/articles.jsonl` 749 條，取自爬蟲課練習站，可能經刻意修改，**不具法律效力**。`updated_at` 是載入當下的時間，每次執行都不同，所以 Demo 不印出它。
 
