@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：16_context_budget.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/16_context_budget.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：說出同一份資料換格式為什麼長度可以差五倍；用 `to_json`／`to_csv`／`to_markdown` 產出 LLM 可讀的文字，並避開會讓表格結構壞掉的格式；在預算內做取捨，並交出「送出什麼、丟掉什麼」的紀錄。

@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：03_read_jsonl.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/03_read_jsonl.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：讀一份 JSONL 而不讓 pandas 改寫它的內容；把「一頁一個物件、條文在裡面一層」的 API 回應攤平成一列一條；說出每一列從哪個網址來，並用兩個來源互相核對。

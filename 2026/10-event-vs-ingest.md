@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：10_event_vs_ingest.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/10_event_vs_ingest.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：說出一筆資料的「發生時間」與「到達時間」各回答什麼問題；指出以兩者分別做每日計數時，差異落在哪幾列、為什麼；說明「在某個時刻看某一天」為什麼會得到不同的數字；不再把 UTC 時間戳的日期當成本地日期。

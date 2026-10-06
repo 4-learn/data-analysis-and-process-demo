@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：01_position.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/01_position.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：指出一份系統模組清單裡哪些屬於資料處理層；把手上的資料分成事件、文件、文字三種形態，並說出各自接下來會怎麼被處理；用數字說明為什麼原始事件不該整份進 LLM 的 context。

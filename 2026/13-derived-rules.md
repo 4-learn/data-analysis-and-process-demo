@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：13_derived_rules.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/13_derived_rules.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：說出 `apply` 逐列 `if` 在本資料上分錯了哪些列、為什麼不會報錯；用 `np.select` 與 `pd.cut` 寫出邊界明確、缺值有去處的分級；說明 `qcut` 為什麼不能當判定規則；為一條規則輸出版本、門檻、資料期間與依據。

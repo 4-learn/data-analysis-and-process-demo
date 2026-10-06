@@ -3,7 +3,7 @@
 勞動部 AI 大數據人才養成班「Python 資料處理與分析（2026 改版）」的上課示範程式與練習資料。
 本資料夾與上層舊版（`numpy/`、`pandas/`、`plot/`、`workshop/`）互不相干；舊版內容保留不動。
 
-- 講義（HackMD Book）：（發布後補上）
+- 講義（HackMD Book）：https://hackmd.io/c/rycWCxMjzg
 
 ## 環境
 

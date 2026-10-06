@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：11_datetime_resample.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/11_datetime_resample.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：用 `to_datetime` 的 `format` 與 `errors` 讓壞資料報錯而不是消失；對沒有時區的時間做 `tz_localize`，對混合時區的字串用 `utc=True` 再 `tz_convert`；說出 `dt.date`、`dt.floor`、`dt.hour` 各回傳什麼；用 `Grouper`／`resample` 做日與週的彙總，並指出週的起點與 0 列對結果的影響。

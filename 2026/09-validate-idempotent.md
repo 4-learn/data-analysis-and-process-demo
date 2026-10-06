@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：09_validate_idempotent.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/09_validate_idempotent.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：把欄位、格式、白名單、跨欄一致性、唯一性寫成一個「不過就停」的驗證；說明 `concat`＋`drop_duplicates` 為什麼不冪等；用業務鍵與時間戳寫出重跑結果相同的合併，並用指紋證明它；指出增量資料看不到什麼。

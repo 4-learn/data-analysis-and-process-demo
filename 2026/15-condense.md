@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：15_condense.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/15_condense.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：把事件表濃縮成十行以內、每行帶可回溯鍵的摘要；說出摘要裡哪一行是「平均值」會蓋掉的東西；用鍵在明細裡回答「是哪幾筆」，並量出原始事件與摘要的長度差。

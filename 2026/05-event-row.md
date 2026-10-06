@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：05_event_row.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/05_event_row.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：看一段累積事件的程式碼，指出「這種寫法之後為什麼沒辦法 `groupby`」；把一批 dict 一次轉成 DataFrame 並做計數；說出 Series 是一欄、`groupby` 的結果為什麼沒有欄位；在把某欄設成 index 前先證明它唯一。

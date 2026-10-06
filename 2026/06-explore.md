@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：06_explore.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/06_explore.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：拿到一份陌生 CSV，五分鐘內交出「已確認的觀察」與「目前不能回答的問題」，並區分哪些是觀察、哪些是推測；指出 `describe()` 什麼時候什麼都沒告訴你；在決定怎麼處理缺值之前，先說出缺值分布在哪裡。

@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：02_read_files.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/02_read_files.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：讀進一份陌生 CSV 並說出每個欄位為什麼是這個型別；處理一份不是 UTF-8 的檔案而不默默換字；讀完一整個資料夾並證明「沒有重複、沒有掉欄位」。

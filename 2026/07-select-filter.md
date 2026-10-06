@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：07_select_filter.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/07_select_filter.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：說出 `loc` 與 `iloc` 各看什麼；寫出不會因運算子優先順序出錯的複合條件；指出「高信心」加「低信心」為什麼不等於全部；只用 `df.loc[cond, col] = x` 改值，並說明 `df[cond]["col"] = x` 在 pandas 3 為什麼改不到；用兩種寫法求 Top-K，並決定名次相同時怎麼辦。

@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：12_groupby_denominator.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/12_groupby_denominator.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：說出 `size` 和 `count` 各自在算什麼；用 named aggregation 一次產出有名字的多個彙總欄；為一個「違規率」寫出它的分子與分母；找出 `groupby` 之後消失的那些列和那些人，並用名冊把沒有事件的人補回來。

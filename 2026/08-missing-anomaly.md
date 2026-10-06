@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：08_missing_anomaly.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/08_missing_anomaly.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：說出一個欄位的「空」是**沒發生**、**沒記錄**還是**不適用**；算出補 0 與 `dropna` 各讓數字偏多少；分辨「異常＝bug」與「異常＝真的出事」；交出一份清理紀錄，讓別人不看程式也知道少掉的列是哪些、為什麼。

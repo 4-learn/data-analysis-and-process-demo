@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：04_sql_or_pandas.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/04_sql_or_pandas.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：用 `pd.read_sql` 加參數讀一個查詢；同一題寫出 SQL 版與 pandas 版並證明結果相同；說出何時該先在資料庫篩選、何時該拉進來再處理；指出 `read_sql` 讀進來的空值、型別與佔位符在 SQLite 與 MariaDB 之間哪裡不一樣。

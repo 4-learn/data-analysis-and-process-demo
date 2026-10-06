@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：14_merge_fanout.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/14_merge_fanout.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：在執行 `merge` 之前算出它會產生幾列；說出 `inner`／`left`／`outer` 各自讓誰消失；用 `validate` 與 `indicator` 讓 fan-out 與遺漏變成看得見的錯誤；依有效期間合併一份「同一個人有兩列」的名冊；分辨什麼時候該 `concat`、什麼時候該 `merge`。

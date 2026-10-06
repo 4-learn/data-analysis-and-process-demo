@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：17_text_corpus.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/17_text_corpus.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：用 `describe`／分位數說出一份語料「多長」，並據此提出 chunk size 與它要切幾條；說明為什麼按換行切比每 N 字一刀好、以及它仍會切壞什麼；用 `explode` 攤開 list 欄位並預測列數；做一次名冊比對＋regex 的去識別，並列出它**擋不到**的東西。

@@ -6,6 +6,11 @@
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
+## 範例程式碼
+
+- [demo：18_end_to_end.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/18_end_to_end.py)（與本頁 Demo 逐字相同）
+- 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
+
 ## 學習目標與時間
 
 完成後，你能：交出一支從 `events.jsonl` 產出「給 LLM 的摘要 JSONL」的程式，說出每一步擋什麼、改什麼、記了什麼；用指紋證明它可重跑；用故意弄壞的資料證明它會拒絕。
