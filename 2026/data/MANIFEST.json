@@ -1,0 +1,72 @@
+{
+  "kind": "teacher-fixture",
+  "source": {
+    "repo": "4-learn/crawler-playground",
+    "commit": "15279335fad7ea22399794efd178d55e7a16d8da",
+    "license": "MIT",
+    "url": "https://raw.githubusercontent.com/4-learn/crawler-playground/15279335fad7ea22399794efd178d55e7a16d8da/data/laws.v1.json",
+    "sha256": "9a5404def3432701b29aee7bc72569782e5726f4e2b4ee54dba4350da1a8c1ce",
+    "upstream": "全國法規資料庫 開放資料 API（中文法規：法律、命令）",
+    "upstream_update_date": "2026/9/24 上午 12:00:00"
+  },
+  "caveat": "條文取自練習站，可能經刻意修改以供練習，不具法律效力。fetched_at 為練習站抓取官方 API 的時間，不是學生爬取時間。09-batches 的 fetched_at（2026-10-12T04:00:00+00:00）是模擬的第二次交付時間；內容依練習站 build.py 的 V2_MODIFY／V2_ADD 產生。",
+  "exports": [
+    {
+      "file": "02-exports/labor-standards.csv",
+      "pcode": "N0030001",
+      "encoding": "utf-8-sig"
+    },
+    {
+      "file": "02-exports/mass-layoff.csv",
+      "pcode": "N0020012",
+      "encoding": "utf-8"
+    },
+    {
+      "file": "02-exports/labor-disputes.csv",
+      "pcode": "N0020007",
+      "encoding": "cp950"
+    }
+  ],
+  "files": {
+    "02-exports/labor-disputes.csv": {
+      "bytes": 21876,
+      "sha256": "0669a8927c938630da52c6cdd381e6d367d48ef246f6822db25c5e2cf3d5ee4b"
+    },
+    "02-exports/labor-standards.csv": {
+      "bytes": 50104,
+      "sha256": "cede157b8d04c3bbf3896bc1a5bd34f05e1072eb95e9c1f880f2571298173596"
+    },
+    "02-exports/mass-layoff.csv": {
+      "bytes": 11559,
+      "sha256": "172335195745d731a5d8647a5f9c4518edc338122a0a51620060d94f0077ff2c"
+    },
+    "03-api/N0020012/page-1.json": {
+      "bytes": 12488,
+      "sha256": "2d45f9cdaa5172abf59c3205648c9ef9f7cffbb5a5c9b902b845999a1b62400f"
+    },
+    "03-api/N0020012/page-2.json": {
+      "bytes": 348,
+      "sha256": "49d33ef532dd4055e0e60b4ee089bc51e7f955e4a87366f00cfd2f711dcc033c"
+    },
+    "03-crawl/N0020012.jsonl": {
+      "bytes": 18256,
+      "sha256": "aa45e97846e4982bfc9fbd45ab454b2dd2bac730318b85207dd60c39235f7b74"
+    },
+    "09-batches/v2-changes.jsonl": {
+      "bytes": 7220,
+      "sha256": "67c4d0fd68631d317b541ad65cc5d52d0cb4450333036798cf854d96fd9af481"
+    },
+    "09-batches/v2-laws.json": {
+      "bytes": 1070,
+      "sha256": "eeb0d768bf51fd40f035e5ead7fd17e10655b790763d054d72234bab4abe7c05"
+    },
+    "articles.jsonl": {
+      "bytes": 660113,
+      "sha256": "ae2ea6be7be8d63d4e70314a7cead7cb1b9e70864060a59c79997eb93138edea"
+    }
+  },
+  "environment": {
+    "python": "3.10.15",
+    "generator": "tools/build_fixtures.py"
+  }
+}

@@ -1,0 +1,59 @@
+{
+ "version": 2,
+ "items": [
+  {
+   "code": "N0030001",
+   "title": "勞動基準法",
+   "updated": "20240731",
+   "articles": 99
+  },
+  {
+   "code": "N0030014",
+   "title": "性別平等工作法",
+   "updated": "20230816",
+   "articles": 50
+  },
+  {
+   "code": "N0030020",
+   "title": "勞工退休金條例",
+   "updated": "20190515",
+   "articles": 69
+  },
+  {
+   "code": "N0060001",
+   "title": "職業安全衛生法",
+   "updated": "20251219",
+   "articles": 61
+  },
+  {
+   "code": "N0090001",
+   "title": "就業服務法",
+   "updated": "20250120",
+   "articles": 85
+  },
+  {
+   "code": "N0020007",
+   "title": "勞資爭議處理法",
+   "updated": "20210428",
+   "articles": 67
+  },
+  {
+   "code": "N0020012",
+   "title": "大量解僱勞工保護法",
+   "updated": "20150701",
+   "articles": 20
+  },
+  {
+   "code": "N0050031",
+   "title": "勞工職業災害保險及保護法",
+   "updated": "20210430",
+   "articles": 109
+  },
+  {
+   "code": "N0060014",
+   "title": "營造安全衛生設施標準",
+   "updated": "20260630",
+   "articles": 189
+  }
+ ]
+}

@@ -1,0 +1,96 @@
+{
+  "kind": "synthetic-fixture",
+  "seed": 20261005,
+  "site": "示範工地",
+  "caveat": "全部為合成資料：人名、電話、工號、事件皆虛構；法條對應僅供練習，不是法律意見。",
+  "zones": {
+    "Z1": {
+      "name": "出入口",
+      "cameras": [
+        "cam-01",
+        "cam-02"
+      ]
+    },
+    "Z2": {
+      "name": "鋼構組立",
+      "cameras": [
+        "cam-03",
+        "cam-04"
+      ]
+    },
+    "Z3": {
+      "name": "開挖區",
+      "cameras": [
+        "cam-05",
+        "cam-06"
+      ]
+    },
+    "Z4": {
+      "name": "施工架",
+      "cameras": [
+        "cam-07",
+        "cam-08"
+      ]
+    }
+  },
+  "planted": {
+    "period_local": "2026-08-31..2026-09-26，週日停工",
+    "never_seen_workers": [
+      "W053",
+      "W054",
+      "W055",
+      "W056",
+      "W057",
+      "W058",
+      "W059",
+      "W060"
+    ],
+    "repeat_offenders": [
+      "W007",
+      "W018",
+      "W029",
+      "W041",
+      "W044"
+    ],
+    "roster_duplicate_key": "W023（2026-09-14 轉承攬商，名冊兩列）",
+    "late_batch": "cam-05 2026-09-10 10:00 後斷線（cam-06 停機保養），事件於 2026-09-11 09:05（+08:00）補傳",
+    "duplicate_resend": "同一批補傳 20 筆送了兩次（event_id 相同，ingested_at 晚 14 分鐘）",
+    "confidence_not_recorded": "cam-08（model_version=ppe-v2）confidence 一律為 null",
+    "confidence_percent_bug": "cam-02 2026-09-15～17 confidence 為 40–99 的百分比",
+    "true_anomaly": "W041 2026-09-22 14:02 起 cam-07 連續 18 筆 no_harness",
+    "unidentified": "worker_id 空字串＝辨識不到臉，事件仍然發生",
+    "handled_at_empty": "違規未處理＝沒發生；ppe_ok＝不適用"
+  },
+  "counts": {
+    "events_rows": 2838,
+    "events_unique_ids": 2818,
+    "workers_rows": 61,
+    "reports": 40
+  },
+  "files": {
+    "dashboard-export.csv": {
+      "bytes": 57351,
+      "sha256": "9d7e2c5ee990772a41501fdfe3c6ba975e27208954f2b9885368474e2d6a0138"
+    },
+    "event-types.csv": {
+      "bytes": 410,
+      "sha256": "09f588b8eeff5b572bcc698d232d8ef31925c675bcfee22e7dd12bb636d81f92"
+    },
+    "events.jsonl": {
+      "bytes": 1005370,
+      "sha256": "08d2790574f445e926a6c712bf8ccfba0430c1598d581856063a547630fece1d"
+    },
+    "near-miss-reports.jsonl": {
+      "bytes": 12413,
+      "sha256": "32d19fea3b7678be1ff321d2ae9d8691c320c66eab55199755b180e20bb366d4"
+    },
+    "workers.csv": {
+      "bytes": 3212,
+      "sha256": "c719adce0aa196842a534351afdd09a851168804966edda27d72e8dff7cc65af"
+    }
+  },
+  "environment": {
+    "python": "3.10.15",
+    "generator": "tools/build_events.py"
+  }
+}
