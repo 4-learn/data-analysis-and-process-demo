@@ -1,0 +1,5 @@
+event_type,label_zh,is_violation,pcode,slug,basis
+ppe_ok,防護具正確,false,,,
+no_helmet,未戴安全帽,true,N0060014,11-1,進入營繕工程工作場所應正確戴用安全帽
+no_harness,高處未使用安全帶,true,N0060014,19,高度二公尺以上有墜落之虞且防護設備開啟時應使用安全帶
+restricted_entry,跨越警示線,true,N0060014,24,作業進行中應禁止勞工跨越警示線
