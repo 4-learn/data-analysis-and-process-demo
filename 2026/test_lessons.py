@@ -441,6 +441,22 @@ def test_demo_runs_as_script(lesson, tmp_path):
     assert r.returncode == 0, r.stderr
 
 
+EXCERPT = re.compile(r"<!-- 節錄: ([\w.]+) -->\n```python\n(.*?)\n```", re.S)
+
+
+@pytest.mark.parametrize("lesson", sorted(p.name for p in ROOT.glob("[0-1][0-9]-*.md")))
+def test_walkthrough_excerpts_are_verbatim(lesson):
+    """〈程式逐段解說〉的每個節錄都必須逐字出現在同一篇的完整 Demo 裡，改了 Demo 就會在這裡失敗。"""
+    text = (ROOT / lesson).read_text(encoding="utf-8")
+    excerpts = EXCERPT.findall(text)
+    if not excerpts:
+        pytest.skip("本節沒有逐段解說")
+    (name, code), = DEMO.findall(text)
+    for file, snippet in excerpts:
+        assert file == name, f"節錄標的 {file} 與 Demo {name} 不同"
+        assert snippet in code, f"{lesson} 節錄與 Demo 不一致：\n{snippet[:200]}"
+
+
 @pytest.mark.parametrize("lesson", sorted(p.name for p in ROOT.glob("[0-1][0-9]-*.md")))
 def test_exported_demo_matches_lesson(lesson):
     """demo repo 裡的 NN_xxx.py 必須與講義內嵌 Demo 逐字相同（本機原稿目錄沒有 .py 時略過）。"""
