@@ -68,6 +68,13 @@ articles.jsonl 有、資料表沒有的欄位：['source_version']
 
 題目：每部法規有幾條？
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `pd.read_sql(sql, con, params=)` | 執行 SQL，把結果直接變成 `DataFrame`；`params` 是 `?` 佔位符的值（tuple） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.read_sql.html#pandas.read_sql) |
+| `.reset_index(name=, drop=)` | 把標籤變回一般欄位，列號重新從 0 開始。`drop=True` 直接丟掉舊標籤；`name=` 給 `Series` 的值欄取名 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reset_index.html#pandas.DataFrame.reset_index) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`groupby().size()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.size.html#pandas.api.typing.DataFrameGroupBy.size)（第 02 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節） |
+
 ```python
 # 本節測試不涵蓋這段（節錄自下方 Demo 主程式第二段）
 # SQL 做：資料庫算好，只傳 9 列回來
@@ -147,6 +154,11 @@ LLM 組要「營造安全衛生設施標準裡提到『墜落』的條文」。A
 
 AI 最常給的「先篩再拉」：
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`pd.read_sql()`](https://pandas.pydata.org/docs/reference/api/pandas.read_sql.html#pandas.read_sql)（第 04 節） |
+
 ```python
 # 本節測試不涵蓋這段（錯誤示範；同一寫法即 Demo 的 naive_find()）
 sql = f"SELECT pcode, slug, content FROM law_articles WHERE pcode = '{pcode}' AND content LIKE '%{keyword}%'"
@@ -217,6 +229,11 @@ groupby 預設 728 列；dropna=False 749 列
 
 ### 第 0 段：資料表與欄位白名單
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| （無） | 本段只用到 Python 基礎與前幾門課學過的寫法，沒有新的函式 | — |
+
 <!-- 節錄: 04_sql_or_pandas.py -->
 ```python
 COLUMNS = ["pcode", "law_name", "slug", "article_no", "chapter", "content",
@@ -233,6 +250,14 @@ INSERT = f"INSERT INTO law_articles ({', '.join(COLUMNS)}) VALUES ({', '.join('?
 `INSERT` 裡拼進去的只有**欄名**（來自程式自己的常數），**值**一律是 `?`。這和第四節的拼接不一樣。
 
 ### 第 1 段：`build_db()` 與 `load()`
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `sqlite3.connect(":memory:")` | 開一個 SQLite 資料庫連線；`":memory:"` 建在記憶體、不寫檔 | [文件](https://docs.python.org/3.12/library/sqlite3.html#sqlite3.connect) |
+| `df.itertuples(index=False, name=)` | 一列一列取出成 tuple。`index=False` 不含列標籤；`name=None` 得到普通 tuple（不給則是可以用 `row.欄名` 取值的具名 tuple） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.itertuples.html#pandas.DataFrame.itertuples) |
+| `con.executemany(sql, 多筆資料)` | 同一句 SQL 對多筆資料各執行一次（批次寫入） | [文件](https://docs.python.org/3.12/library/sqlite3.html#sqlite3.Connection.executemany) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df.columns`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.columns.html#pandas.DataFrame.columns)（第 02 節）、[`con.execute()`](https://docs.python.org/3.12/library/sqlite3.html#sqlite3.Connection.execute)（MariaDB 10）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節） |
 
 <!-- 節錄: 04_sql_or_pandas.py -->
 ```python
@@ -262,6 +287,11 @@ def load(con, articles):
 
 ### 第 2 段：`find_articles()`，安全的先篩再拉
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`pd.read_sql()`](https://pandas.pydata.org/docs/reference/api/pandas.read_sql.html#pandas.read_sql)（第 04 節） |
+
 <!-- 節錄: 04_sql_or_pandas.py -->
 ```python
 def find_articles(con, pcode, keyword, columns=("pcode", "slug", "article_no", "content")):
@@ -284,6 +314,11 @@ def find_articles(con, pcode, keyword, columns=("pcode", "slug", "article_no", "
 
 ### 第 3 段：`naive_find()`，對照組
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`pd.read_sql()`](https://pandas.pydata.org/docs/reference/api/pandas.read_sql.html#pandas.read_sql)（第 04 節） |
+
 <!-- 節錄: 04_sql_or_pandas.py -->
 ```python
 def naive_find(con, pcode, keyword):
@@ -295,6 +330,11 @@ def naive_find(con, pcode, keyword):
 把**值**用 f-string 拼進 SQL。只用來示範第四節的三種輸入，**不要拿去用**。
 
 ### 第 4 段：兩個小工具
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`s.encode()`](https://docs.python.org/3.12/library/stdtypes.html#str.encode)（爬蟲 15）、[`df.itertuples()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.itertuples.html#pandas.DataFrame.itertuples)（第 04 節）、[`df.columns`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.columns.html#pandas.DataFrame.columns)（第 02 節）、[`s.dtype`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dtype.html#pandas.Series.dtype)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節） |
 
 <!-- 節錄: 04_sql_or_pandas.py -->
 ```python
@@ -327,6 +367,16 @@ def describe(df):
 ### 完整程式
 
 以下為完整 `04_sql_or_pandas.py`，只讀 `data/articles.jsonl`，資料庫建在記憶體裡，不寫檔、不連線。
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `sqlite3.IntegrityError` | 違反唯一鍵、NOT NULL 等限制時丟出的例外 | [文件](https://docs.python.org/3.12/library/sqlite3.html#sqlite3.IntegrityError) |
+| `.equals(另一個)` | 兩個表／欄是否完全相同：值、標籤、**型別**都要一樣 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.equals.html#pandas.DataFrame.equals) |
+| `.notna()` | 跟 `isna()` 相反：不是缺值的為 True | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.notna.html#pandas.Series.notna) |
+| `.tolist()` | 轉成 Python list（`Series`、`Index`、`unique()` 的結果都可以） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.tolist.html) |
+| `con.close()` | 關閉資料庫連線 | [文件](https://docs.python.org/3.12/library/sqlite3.html#sqlite3.Connection.close) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`Path(__file__).resolve().parent`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve)（第 02 節）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10）、[`df.columns`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.columns.html#pandas.DataFrame.columns)（第 02 節）、[`sqlite3.connect()`](https://docs.python.org/3.12/library/sqlite3.html#sqlite3.connect)（第 04 節）、[`con.execute()`](https://docs.python.org/3.12/library/sqlite3.html#sqlite3.Connection.execute)（MariaDB 10）、[`df.itertuples()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.itertuples.html#pandas.DataFrame.itertuples)（第 04 節）、[`con.executemany()`](https://docs.python.org/3.12/library/sqlite3.html#sqlite3.Connection.executemany)（第 04 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`pd.read_sql()`](https://pandas.pydata.org/docs/reference/api/pandas.read_sql.html#pandas.read_sql)（第 04 節）、[`s.encode()`](https://docs.python.org/3.12/library/stdtypes.html#str.encode)（爬蟲 15）、[`s.dtype`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dtype.html#pandas.Series.dtype)（第 02 節）、[`pd.read_json()`](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json)（第 03 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`df.head()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.head.html#pandas.DataFrame.head)（第 02 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節）、[`.reset_index()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reset_index.html#pandas.DataFrame.reset_index)（第 04 節）、[`groupby().size()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.size.html#pandas.api.typing.DataFrameGroupBy.size)（第 02 節）、[`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`s.str.contains()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.contains.html#pandas.Series.str.contains)（第 03 節）、[`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 03 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`df.shape`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.shape.html#pandas.DataFrame.shape)（第 03 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 03 節）、[`.isna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna)（第 03 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節） |
 
 <!-- demo: 04_sql_or_pandas.py -->
 ```python
@@ -465,6 +515,12 @@ python3 04_sql_or_pandas.py
 ## 七、換成 MariaDB 時要改什麼
 
 連線沿用 MariaDB 課第 10、13 節（受限帳號、設定檔不進版控、`closing()` 管理生命週期），本節不重教。
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `warnings.filterwarnings("ignore", message=, category=)` | 只關掉**符合條件**的那一種警告，其他照常顯示 | [文件](https://docs.python.org/3.12/library/warnings.html#warnings.filterwarnings) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`with closing()`](https://docs.python.org/3.12/library/contextlib.html#contextlib.closing)（MariaDB 10）、[`pd.read_sql()`](https://pandas.pydata.org/docs/reference/api/pandas.read_sql.html#pandas.read_sql)（第 04 節） |
 
 ```python
 # 需要 MariaDB 伺服器與 mariadb==1.1.14（MariaDB 課第 10 節）；N0060014 含「墜落」實測 15 列，與 SQLite 版相同

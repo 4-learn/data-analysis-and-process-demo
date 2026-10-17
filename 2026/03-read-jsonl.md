@@ -70,6 +70,11 @@ flowchart LR
 
 AI 最常給的寫法：
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `pd.read_json(path, lines=True, dtype=False, convert_dates=False)` | 讀 JSON／JSONL 成 `DataFrame`。`lines=True` 一行一筆（JSONL）；`dtype=False` 不猜型別；`convert_dates=False` 不依欄名自動轉日期 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json) |
+
 ```python
 df = pd.read_json("data/03-crawl/N0020012.jsonl", lines=True)
 ```
@@ -108,6 +113,11 @@ pandas 3.0 會對這個預設值發出 `Pandas4Warning`，**但只是警告，�
 ## 三、先決定型別，再讀
 
 做法跟第 02 節一樣：**不讓 pandas 猜**。
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`pd.read_json()`](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json)（第 03 節） |
 
 ```python
 pd.read_json(path, lines=True, dtype=False, convert_dates=False)
@@ -185,6 +195,11 @@ flowchart LR
 
 ### 第 0 段：設定
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`Path(__file__).resolve().parent`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve)（第 02 節）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10） |
+
 <!-- 節錄: 03_read_jsonl.py -->
 ```python
 DATA = Path(__file__).resolve().parent / "data"
@@ -202,6 +217,11 @@ PROVENANCE = ["source_url", "fetched_at", "content_hash", "source_version"]
 | `PROVENANCE` | 四個必須保留的來源欄位 |
 
 ### 第 1 段：`read_jsonl()`，讀 JSONL
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`pd.read_json()`](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json)（第 03 節） |
 
 <!-- 節錄: 03_read_jsonl.py -->
 ```python
@@ -221,6 +241,16 @@ def read_jsonl(path):
 讀完立刻 `check_provenance(df)`。**讀檔和檢查綁在一起**，呼叫的人不可能忘記檢查。
 
 ### 第 2 段：`check_provenance()`，四項來源檢查
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `.isna()` | 每一格是不是缺值（`NaN`／`None`／`NaT`），得到 True／False | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna) |
+| `s.str.contains(樣式, regex=, na=)` | 每個字串是否包含某段文字或符合正規表示式；`regex=False` 當普通文字找 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.contains.html#pandas.Series.str.contains) |
+| `&`／`\|`／`~` | 布林遮罩的「且／或／非」。pandas 不能用 `and`／`or`／`not`；每個條件要加括號：`(a > 1) & (b == "x")` | [文件](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators) |
+| `df.loc[列條件, 欄]` | 依**標籤**或布林條件選列，同時選欄：`df.loc[df["x"] > 1, "y"]`。要改值也用它 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc) |
+| `s.map(函式或 dict)` | 對每個值套用函式（或依 dict 對照換值），得到新的一欄 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.map.html#pandas.Series.map) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df.columns`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.columns.html#pandas.DataFrame.columns)（第 02 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`.hexdigest()`](https://docs.python.org/3.12/library/hashlib.html#hashlib.hash.hexdigest)（爬蟲 15）、[`s.encode()`](https://docs.python.org/3.12/library/stdtypes.html#str.encode)（爬蟲 15）、[`hashlib.sha256()`](https://docs.python.org/3.12/library/hashlib.html#hashlib.sha256)（爬蟲 15） |
 
 <!-- 節錄: 03_read_jsonl.py -->
 ```python
@@ -250,6 +280,15 @@ def check_provenance(df):
 每一項失敗都**直接拋例外**，訊息寫出幾筆、哪一筆，不是印個警告就繼續。
 
 ### 第 3 段：`flatten_api()`，照 `next` 走完並攤平
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `path.read_text(encoding="utf-8")` | 把整個檔案讀成一個字串 | [文件](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.read_text) |
+| `pd.json_normalize(data, record_path=, meta=)` | 把巢狀 JSON 攤平成表。`record_path` 指定「一列是哪個 list 的元素」；`meta` 指定外層要帶下來的欄位 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.json_normalize.html#pandas.json_normalize) |
+| `.rename(名稱)`／`df.rename(columns={舊: 新})` | `Series` 改名稱；`DataFrame` 改欄名 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.rename.html#pandas.Series.rename) |
+| `.drop(columns=)`／`s.drop(標籤)` | 去掉指定的欄或標籤，回傳新的物件 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.drop.html#pandas.DataFrame.drop) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`json.loads()`](https://docs.python.org/3.12/library/json.html#json.loads)（爬蟲 03）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`pd.concat()`](https://pandas.pydata.org/docs/reference/api/pandas.concat.html#pandas.concat)（第 02 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節） |
 
 <!-- 節錄: 03_read_jsonl.py -->
 ```python
@@ -302,6 +341,15 @@ def flatten_api(folder, first="page-1.json"):
 ## 六、完整程式與執行結果
 
 以下為完整 `03_read_jsonl.py`，只讀 `data/03-crawl/` 與 `data/03-api/`，不寫檔、不連線。
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `df.to_json(orient="records", lines=True, force_ascii=False)` | `DataFrame` 轉 JSON 字串。這三個參數合起來＝JSONL、一列一個物件、中文不轉成 `\uXXXX` | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_json.html#pandas.DataFrame.to_json) |
+| `df.shape` | （列數, 欄數）的 tuple；`df.shape[1]` 是欄數 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.shape.html#pandas.DataFrame.shape) |
+| `left.merge(right, on=, how=, validate=, indicator=)` | 依共同欄位把兩張表接起來（SQL 的 JOIN）。`how` 是 inner／left；`validate="one_to_one"` 等會在鍵重複時報錯；`indicator=True` 多一欄標出每列來自哪邊 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.merge.html#pandas.DataFrame.merge) |
+| `df.tail(n)` | 最後 n 列 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.tail.html#pandas.DataFrame.tail) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`Path(__file__).resolve().parent`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve)（第 02 節）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10）、[`pd.read_json()`](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json)（第 03 節）、[`df.columns`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.columns.html#pandas.DataFrame.columns)（第 02 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 02 節）、[`.isna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna)（第 03 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`s.str.contains()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.contains.html#pandas.Series.str.contains)（第 03 節）、[`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 03 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 03 節）、[`.hexdigest()`](https://docs.python.org/3.12/library/hashlib.html#hashlib.hash.hexdigest)（爬蟲 15）、[`s.encode()`](https://docs.python.org/3.12/library/stdtypes.html#str.encode)（爬蟲 15）、[`hashlib.sha256()`](https://docs.python.org/3.12/library/hashlib.html#hashlib.sha256)（爬蟲 15）、[`s.map()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.map.html#pandas.Series.map)（第 03 節）、[`json.loads()`](https://docs.python.org/3.12/library/json.html#json.loads)（爬蟲 03）、[`path.read_text()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.read_text)（第 03 節）、[`pd.json_normalize()`](https://pandas.pydata.org/docs/reference/api/pandas.json_normalize.html#pandas.json_normalize)（第 03 節）、[`pd.concat()`](https://pandas.pydata.org/docs/reference/api/pandas.concat.html#pandas.concat)（第 02 節）、[`.rename()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.rename.html#pandas.Series.rename)（第 03 節）、[`.drop()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.drop.html#pandas.DataFrame.drop)（第 03 節）、[`s.dtype`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dtype.html#pandas.Series.dtype)（第 02 節）、[`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節） |
 
 <!-- demo: 03_read_jsonl.py -->
 ```python
@@ -440,6 +488,11 @@ slug                                                               source_url_cr
 ### 任務與時間
 
 **35–43 分鐘：讀全量。** 用 `read_jsonl()` 讀 `data/articles.jsonl`（9 部法規、749 條），輸出「每部法規有幾條」：
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`groupby().size()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.size.html#pandas.api.typing.DataFrameGroupBy.size)（第 02 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節） |
 
 ```python
 # Workshop 起手式，本節測試不涵蓋這段

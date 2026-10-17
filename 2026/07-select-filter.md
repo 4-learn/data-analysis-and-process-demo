@@ -102,6 +102,11 @@ c == float('nan') 有 0 筆；c.isna() 有 231 筆
 
 要把 cam-02 那 69 筆百分比改回小數。網路上和 AI 最常給的寫法是先篩、再選欄、再賦值：
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節） |
+
 ```python
 # AI 常見寫法，本節測試不涵蓋這段（完整版是 Demo 的 chained_assignment()）
 df[df["confidence"] > 1]["confidence"] = df[df["confidence"] > 1]["confidence"] / 100
@@ -134,6 +139,21 @@ pandas 3.0 起全面採用 **Copy-on-Write**：任何索引的結果都**表現�
 ## 五、Top-K 三種寫法，以及名次相同
 
 以下為完整 `07_select_filter.py`，只讀 `data/events/events.jsonl` 與 `event-types.csv`，不寫檔、不連線。
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `s.isin(集合)` | 每個值是不是在集合裡，得到 True／False 一欄，常放進 `df[...]` 篩選 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.isin.html#pandas.Series.isin) |
+| `.copy()` | 複製一份；之後改它不會動到原本的資料 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.copy.html#pandas.DataFrame.copy) |
+| `warnings.catch_warnings(record=True)` | 搭配 `with`：在區塊內把發出的警告收集成 list，而不是印出來 | [文件](https://docs.python.org/3.12/library/warnings.html#warnings.catch_warnings) |
+| `warnings.simplefilter("always")` | 設定警告怎麼處理；`"always"` 每次都發出（不因重複而略過） | [文件](https://docs.python.org/3.12/library/warnings.html#warnings.simplefilter) |
+| `s.str.endswith(後綴)` | 每個字串是否以某段文字結尾 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.endswith.html#pandas.Series.str.endswith) |
+| `.nlargest(k, keep=)` | 最大的 k 個；`keep` 決定並列時怎麼取（`"first"`、`"last"`、`"all"`） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.nlargest.html#pandas.Series.nlargest) |
+| `s.mask(條件, 其他)` | 跟 `where` 相反：條件**成立**的換掉，其他保留 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.mask.html#pandas.Series.mask) |
+| `df.query("欄 == '值' and 欄2 > 1")` | 用一段字串寫篩選條件；條件裡可以直接寫欄名 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html#pandas.DataFrame.query) |
+| `.sort_values(欄, ascending=, kind="stable")` | 依值排序；`ascending=False` 由大到小；`kind="stable"` 值相同時保留原本順序 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.sort_values.html#pandas.DataFrame.sort_values) |
+| `s.rank(method="min", ascending=False)` | 排名；`method="min"` 讓同分的人拿同一個（最好的）名次 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.rank.html#pandas.Series.rank) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`Path(__file__).resolve().parent`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve)（第 02 節）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10）、[`pd.read_json()`](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json)（第 03 節）、[`pd.read_csv()`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html#pandas.read_csv)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 03 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df.assign()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.assign.html#pandas.DataFrame.assign)（第 06 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`整欄運算`](https://pandas.pydata.org/docs/user_guide/basics.html#flexible-binary-operations)（第 06 節）、[`.all()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.all.html#pandas.Series.all)（第 06 節）、[`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 03 節）、[`df.index`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.index.html#pandas.DataFrame.index)（第 05 節）、[`.tolist()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.tolist.html)（第 04 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`s[標籤]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 05 節）、[`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`.astype()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.astype.html#pandas.Series.astype)（第 06 節）、[`s.str[a:b]`](https://pandas.pydata.org/docs/user_guide/text.html#indexing-with-str)（第 06 節）、[`.isna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna)（第 03 節）、[`.to_dict()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.to_dict.html#pandas.Series.to_dict)（第 05 節）、[`s.value_counts()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.value_counts.html#pandas.Series.value_counts)（第 05 節）、[`.equals()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.equals.html#pandas.DataFrame.equals)（第 04 節）、[`.nunique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html#pandas.Series.nunique)（第 05 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節）、[`groupby().size()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.size.html#pandas.api.typing.DataFrameGroupBy.size)（第 02 節）、[`df.head()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.head.html#pandas.DataFrame.head)（第 02 節）、[`.drop()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.drop.html#pandas.DataFrame.drop)（第 03 節）、[`.rename()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.rename.html#pandas.Series.rename)（第 03 節）、[`.reset_index()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reset_index.html#pandas.DataFrame.reset_index)（第 04 節） |
 
 <!-- demo: 07_select_filter.py -->
 ```python

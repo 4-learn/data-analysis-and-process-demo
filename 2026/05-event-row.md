@@ -52,6 +52,11 @@ pd.DataFrame(list of dict) 的欄名：['event_id', 'site', 'zone', 'camera_id']
 
 收到事件就包成一個 DataFrame，看起來很「物件導向」：
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `pd.DataFrame(資料, columns=)` | 建立表格。資料可以是「一列一個 dict 的 list」或「欄名 → 一欄值的 dict」 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame) |
+
 ```python
 # 示意，本節測試不涵蓋這段
 event1 = pd.DataFrame([records[0]])
@@ -76,6 +81,11 @@ event2 = pd.DataFrame([records[1]])
 ## 三、迴圈裡 `df = pd.concat([df, row])`
 
 AI 最常給的「累積」寫法。舊一點的版本寫 `df = df.append(row)`——`append` 在 pandas 2.0 已移除，pandas 3.0.6 和 2.3.3 都是 `AttributeError: 'DataFrame' object has no attribute 'append'`（教師實測）。於是 AI 改成：
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`pd.DataFrame()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame)（第 05 節）、[`pd.concat()`](https://pandas.pydata.org/docs/reference/api/pandas.concat.html#pandas.concat)（第 02 節） |
 
 ```python
 # AI 常見寫法，本節測試不涵蓋這段（完整版是 Demo 的 concat_in_loop()）
@@ -105,6 +115,23 @@ looped.loc[0] 拿到 200 列，不是 1 列
 先把事件收進 list（Python 的 list `append` 很便宜），**最後一次**轉成 DataFrame。`build_table()` 再多做一件事：每一筆的欄位必須剛好是 12 個 schema 欄位，少一個或多一個就停。欄位是契約，不是「有就放、沒有就算了」。
 
 以下為完整 `05_event_row.py`，只讀 `data/events/events.jsonl`，不寫檔、不連線。
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `s.unique()` | 不重複的值（依出現順序） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.unique.html#pandas.Series.unique) |
+| `df.set_index(欄)` | 把某一欄當成列的標籤 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.set_index.html#pandas.DataFrame.set_index) |
+| `pd.Series(資料, index=, name=, dtype=)` | 建立「一欄」：有 index（標籤）的一維資料。`DataFrame` 的每一欄都是一個 `Series` | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.html#pandas.Series) |
+| `s.value_counts()` | 每個值出現幾次，由多到少排列 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.value_counts.html#pandas.Series.value_counts) |
+| `s.to_dict()`／`df.to_dict("records")` | 轉成 Python dict；`Series` 是「index → 值」，`df.to_dict("records")` 是「一列一個 dict 的 list」 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.to_dict.html#pandas.Series.to_dict) |
+| `d.items()` | 逐一取出 dict 的（key, 值），可以放進 `for k, v in d.items()` | [文件](https://docs.python.org/3.12/library/stdtypes.html#dict.items) |
+| `df.index` | 列的標籤（預設是 0、1、2…）；篩選後會保留原本的標籤，不會重新編號 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.index.html#pandas.DataFrame.index) |
+| `.is_unique` | 這一欄（或 index）的值是不是都不重複（True／False） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.is_unique.html#pandas.Series.is_unique) |
+| `df.select_dtypes("number")` | 只留指定型別的欄位 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.select_dtypes.html#pandas.DataFrame.select_dtypes) |
+| `index.names` | 多層 index 每一層的名字 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.MultiIndex.names.html#pandas.MultiIndex.names) |
+| `s[標籤]` | 從 `Series` 依標籤取一個值，例如 `counts["W041"]`；給布林遮罩則是篩選 | [文件](https://pandas.pydata.org/docs/user_guide/indexing.html#basics) |
+| `.nunique(dropna=)` | 有幾個不同的值；`dropna=False` 時 `NaN` 也算一種 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html#pandas.Series.nunique) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`Path(__file__).resolve().parent`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve)（第 02 節）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10）、[`path.read_text()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.read_text)（第 03 節）、[`json.loads()`](https://docs.python.org/3.12/library/json.html#json.loads)（爬蟲 03）、[`pd.DataFrame()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame)（第 05 節）、[`pd.concat()`](https://pandas.pydata.org/docs/reference/api/pandas.concat.html#pandas.concat)（第 02 節）、[`.duplicated()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.duplicated.html#pandas.DataFrame.duplicated)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 03 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`df.columns`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.columns.html#pandas.DataFrame.columns)（第 02 節）、[`.tolist()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.tolist.html)（第 04 節）、[`s.dtype`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dtype.html#pandas.Series.dtype)（第 02 節）、[`df.shape`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.shape.html#pandas.DataFrame.shape)（第 03 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`.isna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna)（第 03 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節）、[`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`groupby().size()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.size.html#pandas.api.typing.DataFrameGroupBy.size)（第 02 節）、[`.reset_index()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reset_index.html#pandas.DataFrame.reset_index)（第 04 節）、[`df.head()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.head.html#pandas.DataFrame.head)（第 02 節） |
 
 <!-- demo: 05_event_row.py -->
 ```python
@@ -278,6 +305,11 @@ index_by_event_id() → ValueError: event_id 重複：20 個 id 共 40 列，例
 ### 任務與時間
 
 **35–40 分鐘：判斷兩種寫法。** 同事交來兩段程式，都要「統計前 500 筆事件中，未戴安全帽（`no_helmet`）有幾次」：
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`pd.DataFrame()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame)（第 05 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節） |
 
 ```python
 # 寫法 A——Workshop 題目，本節測試不涵蓋這段

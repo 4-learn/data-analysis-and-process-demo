@@ -62,6 +62,11 @@ confidence    null  231 沒記錄（cam-08）
 
 AI 最常給的處理：
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.fillna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.fillna.html#pandas.Series.fillna)（第 06 節） |
+
 ```python
 df["confidence"] = df["confidence"].fillna(0)
 ```
@@ -145,6 +150,25 @@ IQR 1.5 倍    清掉 68 格、165 筆事件；W041 09-22 被清掉：True；清
 把以上判斷寫成一個 `clean()`：只做有理由的動作，每一步記下來，被丟的列另外交出去。
 
 以下為完整 `08_missing_anomaly.py`，只讀 `data/`，不寫檔、不連線。
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `s.std()` | 標準差 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.std.html#pandas.Series.std) |
+| `s.abs()` | 絕對值 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.abs.html#pandas.Series.abs) |
+| `s.quantile([0.25, 0.75])` | 分位數，例如 0.25 是第一四分位數 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.quantile.html#pandas.Series.quantile) |
+| `.drop_duplicates(欄, keep="first")` | 去掉重複的列，同一個鍵只留一列 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.drop_duplicates.html#pandas.DataFrame.drop_duplicates) |
+| `.groupby(...)[欄].sum()` | 每組加總 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.SeriesGroupBy.sum.html#pandas.api.typing.SeriesGroupBy.sum) |
+| `.groupby(...)[欄].mean()` | 每組平均（跳過缺值） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.SeriesGroupBy.mean.html#pandas.api.typing.SeriesGroupBy.mean) |
+| `df.iterrows()` | 一列一列取出（標籤, 那一列的 `Series`）；慢，只在列很少時用 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iterrows.html#pandas.DataFrame.iterrows) |
+| `np.nan` | NumPy 的「缺值」，型別是浮點數 | [文件](https://numpy.org/doc/stable/reference/constants.html#numpy.nan) |
+| `.replace(舊, 新, regex=)` | 把某個值換成另一個值（例如 `""` 換成 `np.nan`）；`regex=True` 時「舊」是正規表示式 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.replace.html#pandas.Series.replace) |
+| `s.idxmax()` | 最大值所在的**標籤**（不是值本身） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.idxmax.html#pandas.Series.idxmax) |
+| `s.median()` | 中位數 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.median.html#pandas.Series.median) |
+| `pd.MultiIndex.from_arrays([欄1, 欄2])` | 把兩欄組成「兩層」的標籤，例如（人, 日）一組；可以拿來跟另一個兩層 index 比對 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.MultiIndex.from_arrays.html#pandas.MultiIndex.from_arrays) |
+| `s.str.startswith(前綴)` | 每個字串是否以某段文字開頭 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.startswith.html#pandas.Series.str.startswith) |
+| `s.get(標籤, 預設)` | 依標籤取值；沒有這個標籤就回傳預設值，不會報錯 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.get.html#pandas.Series.get) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`Path(__file__).resolve().parent`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve)（第 02 節）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10）、[`pd.read_json()`](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json)（第 03 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 03 節）、[`.isna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna)（第 03 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 03 節）、[`s.unique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.unique.html#pandas.Series.unique)（第 05 節）、[`pd.DataFrame()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame)（第 05 節）、[`整欄運算`](https://pandas.pydata.org/docs/user_guide/basics.html#flexible-binary-operations)（第 06 節）、[`s.mean()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.mean.html#pandas.Series.mean)（第 06 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 02 節）、[`.copy()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.copy.html#pandas.DataFrame.copy)（第 07 節）、[`.duplicated()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.duplicated.html#pandas.DataFrame.duplicated)（第 02 節）、[`df.assign()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.assign.html#pandas.DataFrame.assign)（第 06 節）、[`s.str[a:b]`](https://pandas.pydata.org/docs/user_guide/text.html#indexing-with-str)（第 06 節）、[`s.max()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.max.html#pandas.Series.max)（第 06 節）、[`s.min()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.min.html#pandas.Series.min)（第 06 節）、[`pd.concat()`](https://pandas.pydata.org/docs/reference/api/pandas.concat.html#pandas.concat)（第 02 節）、[`.reset_index()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reset_index.html#pandas.DataFrame.reset_index)（第 04 節）、[`s[標籤]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 05 節）、[`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`.round()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.round.html#pandas.DataFrame.round)（第 06 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節）、[`.fillna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.fillna.html#pandas.Series.fillna)（第 06 節）、[`.dropna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dropna.html#pandas.Series.dropna)（第 06 節）、[`groupby().size()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.size.html#pandas.api.typing.DataFrameGroupBy.size)（第 02 節）、[`.rename()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.rename.html#pandas.Series.rename)（第 03 節）、[`s.isin()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isin.html#pandas.Series.isin)（第 07 節）、[`df.index`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.index.html#pandas.DataFrame.index)（第 05 節）、[`s.value_counts()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.value_counts.html#pandas.Series.value_counts)（第 05 節）、[`df.head()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.head.html#pandas.DataFrame.head)（第 02 節） |
 
 <!-- demo: 08_missing_anomaly.py -->
 ```python

@@ -80,6 +80,11 @@ pandas 在這裡的角色，用舊講義的一句話最準確：**它是系統�
 
 你請 AI 幫忙做「每週一問 LLM 上週哪裡最危險」，最常見的第一版是：
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| （無） | 本段只用到 Python 基礎與前幾門課學過的寫法，沒有新的函式 | — |
+
 ```python
 # AI 常見寫法，本節測試不涵蓋這段
 events = open("data/events/events.jsonl").read()
@@ -137,6 +142,63 @@ Z4       21     25     26     42
 - **即時層也不會發現重送**。cam-05 斷線後補傳的 20 筆被送了兩次（`event_id` 相同、只有 `ingested_at` 晚 14 分鐘）。即時層照單全收；歷史層要先去重，數字才對。`dedupe()` 只在「除了 `ingested_at` 之外完全相同」時才去掉，內容不同就停下來——第 09 節會把這件事講完整。
 
 以下為完整 `01_position.py`，只讀 `data/`，不寫檔、不連線。看不懂 pandas 語法沒關係，本節只要看懂輸出；語法從第 02 節開始。
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `Path(__file__).resolve().parent` | `__file__` 是這支程式自己的路徑；`resolve()` 轉成完整路徑，`.parent` 取所在資料夾。從哪裡執行都找得到 `data/` | [文件](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve) |
+| `ch.isascii()` | 這個字元是不是 ASCII（英數、符號）；中文是 False | [文件](https://docs.python.org/3.12/library/stdtypes.html#str.isascii) |
+| `ch.isdigit()` | 這個字元是不是數字 | [文件](https://docs.python.org/3.12/library/stdtypes.html#str.isdigit) |
+| `math.ceil(x)` | 無條件進位成整數 | [文件](https://docs.python.org/3.12/library/math.html#math.ceil) |
+| `defaultdict(deque)` | 查不到的 key 會自動建立預設值（這裡是空的 `deque`），不會 KeyError | [文件](https://docs.python.org/3.12/library/collections.html#collections.defaultdict) |
+| `datetime.fromisoformat(s)` | ISO 8601 字串（`2026-09-22T14:08:38+08:00`）轉成 `datetime` | [文件](https://docs.python.org/3.12/library/datetime.html#datetime.datetime.fromisoformat) |
+| `(t1 - t0).total_seconds()` | 兩個時間相減得到時間長度，換算成秒 | [文件](https://docs.python.org/3.12/library/datetime.html#datetime.timedelta.total_seconds) |
+| `q.popleft()` | `deque`（雙端佇列）從左邊（最舊的）取出一個；比 list 的 `pop(0)` 快 | [文件](https://docs.python.org/3.12/library/collections.html#collections.deque.popleft) |
+| `d.values()` | dict 所有的值 | [文件](https://docs.python.org/3.12/library/stdtypes.html#dict.values) |
+| `pd.read_json(path, lines=True, dtype=False, convert_dates=False)` | 讀 JSON／JSONL 成 `DataFrame`。`lines=True` 一行一筆（JSONL）；`dtype=False` 不猜型別；`convert_dates=False` 不依欄名自動轉日期 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json) |
+| `df.columns` | 所有欄名。可以 `for c in df.columns`，也可以 `"欄" in df.columns` 檢查有沒有這欄 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.columns.html#pandas.DataFrame.columns) |
+| `.duplicated(欄, keep=)` | 標出重複的列（True／False）。`keep="first"` 第一次出現的不算重複；`keep=False` 所有重複的都標出 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.duplicated.html#pandas.DataFrame.duplicated) |
+| `df[條件]`（布林遮罩） | `df["zone"] == "Z4"` 會得到一整欄 True／False；放進 `df[...]` 只留下 True 的列。這是 pandas 篩選的基本寫法 | [文件](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing) |
+| `.any()`／`.any(axis=1)` | 是否**至少一個** True。`axis=1` 是每一列各算一次 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any) |
+| `df.groupby(欄, sort=, dropna=)` | 依某欄的值分組，後面接 `.size()`、`.sum()`、`.agg()` 算每組。`dropna=False` 時缺值也自成一組（預設會**丟掉**） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby) |
+| `.gt(n)` | 跟 `> n` 一樣，對每一格比較，得到 True／False | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.gt.html#pandas.DataFrame.gt) |
+| `.groupby(...)[欄].nunique()` | 每組裡各欄有幾種不同的值 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.nunique.html#pandas.api.typing.DataFrameGroupBy.nunique) |
+| `.sum()` | 加總。對 True／False 加總＝數有幾個 True | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum) |
+| `df.index` | 列的標籤（預設是 0、1、2…）；篩選後會保留原本的標籤，不會重新編號 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.index.html#pandas.DataFrame.index) |
+| `.drop_duplicates(欄, keep="first")` | 去掉重複的列，同一個鍵只留一列 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.drop_duplicates.html#pandas.DataFrame.drop_duplicates) |
+| `df["欄"]`／`df[["欄1", "欄2"]]` | 取一欄得到 `Series`；給一個 list 取多欄，得到 `DataFrame`。新增欄位也是 `df["新欄"] = 值` | [文件](https://pandas.pydata.org/docs/user_guide/indexing.html#basics) |
+| `df.loc[列條件, 欄]` | 依**標籤**或布林條件選列，同時選欄：`df.loc[df["x"] > 1, "y"]`。要改值也用它 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc) |
+| `s.isin(集合)` | 每個值是不是在集合裡，得到 True／False 一欄，常放進 `df[...]` 篩選 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.isin.html#pandas.Series.isin) |
+| `pd.to_datetime(s, format=, utc=, errors=)` | 字串轉日期時間。`format` 指定格式（`"ISO8601"` 或 `"%Y%m%d"`），格式不符就報錯；`utc=True` 統一轉成 UTC | [文件](https://pandas.pydata.org/docs/reference/api/pandas.to_datetime.html#pandas.to_datetime) |
+| `s.dt.tz_convert("Asia/Taipei")` | 已經有時區的時間，換算成另一個時區（同一個時刻，換個寫法） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.tz_convert.html#pandas.Series.dt.tz_convert) |
+| `s1 - s2`、`s / 100`（整欄運算） | 對整欄直接做加減乘除，每一列各算一次，不用寫迴圈；兩欄相減時依標籤對齊 | [文件](https://pandas.pydata.org/docs/user_guide/basics.html#flexible-binary-operations) |
+| `pd.to_timedelta(s, unit="D")` | 數字轉成時間長度，`unit="D"` 表示單位是天 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.to_timedelta.html#pandas.to_timedelta) |
+| `s.dt.normalize()` | 把時間改成當天 00:00（保留日期與時區） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.normalize.html#pandas.Series.dt.normalize) |
+| `.strftime("%Y-%m-%d")` | 時間轉成指定格式的字串 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.strftime.html#pandas.Series.dt.strftime) |
+| `s.dt.weekday` | 星期幾：週一是 0、週日是 6 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.weekday.html#pandas.Series.dt.weekday) |
+| `pd.crosstab(列, 欄)` | 交叉計數表：每個（列值, 欄值）組合出現幾次 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.crosstab.html#pandas.crosstab) |
+| `.rename(名稱)`／`df.rename(columns={舊: 新})` | `Series` 改名稱；`DataFrame` 改欄名 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.rename.html#pandas.Series.rename) |
+| `df.to_json(orient="records", lines=True, force_ascii=False)` | `DataFrame` 轉 JSON 字串。這三個參數合起來＝JSONL、一列一個物件、中文不轉成 `\uXXXX` | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_json.html#pandas.DataFrame.to_json) |
+| `pd.read_csv(path, dtype=str, keep_default_na=False, encoding=)` | 讀 CSV 成 `DataFrame`。`dtype=str` 每欄都當字串；`keep_default_na=False` 空格保持 `""` 不變 `NaN`；`encoding` 指定編碼 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html#pandas.read_csv) |
+| `s.str.contains(樣式, regex=, na=)` | 每個字串是否包含某段文字或符合正規表示式；`regex=False` 當普通文字找 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.contains.html#pandas.Series.str.contains) |
+| `df.shape` | （列數, 欄數）的 tuple；`df.shape[1]` 是欄數 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.shape.html#pandas.DataFrame.shape) |
+| `.nunique(dropna=)` | 有幾個不同的值；`dropna=False` 時 `NaN` 也算一種 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html#pandas.Series.nunique) |
+| `s.max()` | 最大值（字串欄就是字典順序最大） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.max.html#pandas.Series.max) |
+| `s.mean()` | 平均。`NaN` 會被跳過，不算進分母 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.mean.html#pandas.Series.mean) |
+| `s.str.len()` | 每個字串的長度（字元數） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.len.html#pandas.Series.str.len) |
+| `path.read_text(encoding="utf-8")` | 把整個檔案讀成一個字串 | [文件](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.read_text) |
+| `df.values` | 去掉標籤，只留裡面的值（NumPy 陣列） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.values.html#pandas.DataFrame.values) |
+| `df.to_string(index=)` | 把整張表轉成對齊好的文字（`print` 用）；不會像直接 `print(df)` 那樣把中間省略成 `...` | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string) |
+| `&`／`\|`／`~` | 布林遮罩的「且／或／非」。pandas 不能用 `and`／`or`／`not`；每個條件要加括號：`(a > 1) & (b == "x")` | [文件](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators) |
+| `df.head(n)` | 前 n 列（預設 5） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.head.html#pandas.DataFrame.head) |
+| `.sort_values(欄, ascending=, kind="stable")` | 依值排序；`ascending=False` 由大到小；`kind="stable"` 值相同時保留原本順序 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.sort_values.html#pandas.DataFrame.sort_values) |
+| `.groupby(...).size()` | 每組有幾列 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.size.html#pandas.api.typing.DataFrameGroupBy.size) |
+| `s.items()` | 逐一取出（標籤, 值），可以放進 `for` 迴圈 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.items.html#pandas.Series.items) |
+| `s.str.startswith(前綴)` | 每個字串是否以某段文字開頭 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.startswith.html#pandas.Series.str.startswith) |
+| `df.tail(n)` | 最後 n 列 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.tail.html#pandas.DataFrame.tail) |
+| `df.to_csv(path=None, index=)` | `DataFrame` 轉 CSV；沒給路徑就回傳字串。`index=False` 不輸出列號 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_csv.html#pandas.DataFrame.to_csv) |
+| `s.min()` | 最小值 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.min.html#pandas.Series.min) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10）、[`json.loads()`](https://docs.python.org/3.12/library/json.html#json.loads)（爬蟲 03） |
 
 <!-- demo: 01_position.py -->
 ```python

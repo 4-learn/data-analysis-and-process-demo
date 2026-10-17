@@ -122,6 +122,34 @@ read_raw()：isna 合計 0；各欄可疑字串：
 
 以下為完整 `06_explore.py`，只讀 `data/events/dashboard-export.csv`，不寫檔、不連線。
 
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `re.compile(樣式)` | 把正規表示式先編譯好，重複使用 | [文件](https://docs.python.org/3.12/library/re.html#re.compile) |
+| `io.StringIO(文字)` | 把一段字串包成「檔案」，可以直接丟給 `pd.read_csv`，或讓函式寫進去 | [文件](https://docs.python.org/3.12/library/io.html#io.StringIO) |
+| `df.info(buf=)` | 印出每欄的型別與非空值數量；`buf` 指定要寫到哪裡（預設印到螢幕） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.info.html#pandas.DataFrame.info) |
+| `buf.getvalue()` | 取出寫進 `StringIO` 的全部文字 | [文件](https://docs.python.org/3.12/library/io.html#io.StringIO.getvalue) |
+| `repr(x)` | 顯示值的「原始寫法」，字串會帶引號，看得出空白與 `""` | [文件](https://docs.python.org/3.12/library/functions.html#repr) |
+| `s.str.fullmatch(樣式, na=)` | **整個**字串是否完全符合正規表示式（不是只有一部分符合） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.fullmatch.html#pandas.Series.str.fullmatch) |
+| `.all()` | 是否**全部**都是 True | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.all.html#pandas.Series.all) |
+| `s1 - s2`、`s / 100`（整欄運算） | 對整欄直接做加減乘除，每一列各算一次，不用寫迴圈；兩欄相減時依標籤對齊 | [文件](https://pandas.pydata.org/docs/user_guide/basics.html#flexible-binary-operations) |
+| `pd.to_numeric(s, errors=)` | 把字串轉成數字；`errors="coerce"` 會把轉不了的**默默變 `NaN`** | [文件](https://pandas.pydata.org/docs/reference/api/pandas.to_numeric.html#pandas.to_numeric) |
+| `s.where(條件, 其他)` | 條件成立的保留，不成立的換成「其他」（沒給就是 `NaN`） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.where.html#pandas.Series.where) |
+| `s.str.removesuffix(後綴)` | 有這個結尾就去掉，沒有就不動 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.removesuffix.html#pandas.Series.str.removesuffix) |
+| `df.dtypes` | 每一欄的型別 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.dtypes.html#pandas.DataFrame.dtypes) |
+| `.astype(型別)` | 轉換型別，例如 `.astype(int)`、`.astype(str)` | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.astype.html#pandas.Series.astype) |
+| `df.describe(include=, percentiles=)` | 數值欄的摘要統計：個數、平均、標準差、最小、四分位數、最大 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.describe.html#pandas.DataFrame.describe) |
+| `s.mean()` | 平均。`NaN` 會被跳過，不算進分母 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.mean.html#pandas.Series.mean) |
+| `.dropna(subset=)` | 去掉有缺值的列；`subset` 只看指定欄 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.dropna.html#pandas.Series.dropna) |
+| `s.max()` | 最大值（字串欄就是字典順序最大） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.max.html#pandas.Series.max) |
+| `s.min()` | 最小值 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.min.html#pandas.Series.min) |
+| `.sort_index()` | 依標籤排序 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.sort_index.html#pandas.Series.sort_index) |
+| `.fillna(值)` | 把缺值換成指定的值 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.fillna.html#pandas.Series.fillna) |
+| `df.assign(新欄=值)` | 加上（或覆蓋）欄位，回傳**新的**表，原表不變 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.assign.html#pandas.DataFrame.assign) |
+| `.round(n)` | 四捨五入到小數 n 位 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.round.html#pandas.DataFrame.round) |
+| `s.str[a:b]` | 對整欄每個字串做切片，例如 `event_time.str[:10]` 取出日期部分 | [文件](https://pandas.pydata.org/docs/user_guide/text.html#indexing-with-str) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`Path(__file__).resolve().parent`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve)（第 02 節）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10）、[`pd.read_csv()`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html#pandas.read_csv)（第 02 節）、[`pd.DataFrame()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame)（第 05 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 03 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 02 節）、[`df.shape`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.shape.html#pandas.DataFrame.shape)（第 03 節）、[`df.columns`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.columns.html#pandas.DataFrame.columns)（第 02 節）、[`.tolist()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.tolist.html)（第 04 節）、[`.to_dict()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.to_dict.html#pandas.Series.to_dict)（第 05 節）、[`s.value_counts()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.value_counts.html#pandas.Series.value_counts)（第 05 節）、[`.drop()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.drop.html#pandas.DataFrame.drop)（第 03 節）、[`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.isna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna)（第 03 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 03 節）、[`.notna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.notna.html#pandas.Series.notna)（第 04 節） |
+
 <!-- demo: 06_explore.py -->
 ```python
 """第 06 節：五分鐘探索法——拿到一份沒見過的匯出檔，先看結構、再看內容、最後看缺值。"""
