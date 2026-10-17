@@ -4,7 +4,7 @@
 
 講義是唯一原稿：Demo 程式碼從 `<!-- demo: 檔名 -->` 區塊逐字取出，不另外維護一份。
 匯出內容：每節一支 `NN_xxx.py`、`data/`（含 MANIFEST）、`tools/`（資料產生器）、
-`test_lessons.py` 與各節 `test_lesson_NN.py`（測試會從同目錄的講義 .md 擷取 Demo，
+`test_lessons.py`、`test_fn_tables.py` 與各節 `test_lesson_NN.py`（測試會從同目錄的講義 .md 擷取 Demo，
 所以講義原稿 `NN-*.md` 也一併放在同一層）。匯出後在目標資料夾跑 pytest 必須全過。
 """
 
@@ -74,7 +74,7 @@ def main() -> None:
     if any(p.is_symlink() for p in (out / "data").rglob("*")):
         raise SystemExit("data/ 裡有 symlink，請先清掉")
     shutil.copytree(SRC / "tools", out / "tools", ignore=shutil.ignore_patterns("__pycache__"))
-    for t in sorted(SRC.glob("test_lesson*.py")):
+    for t in sorted(SRC.glob("test_*.py")):
         shutil.copy(t, out / t.name)
     (out / "requirements.txt").write_text(
         "pandas==3.0.6\nnumpy==2.4.6\ntabulate==0.10.0\nopenpyxl==3.1.5\npytest==9.1.1\n", encoding="utf-8")
