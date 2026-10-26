@@ -367,3 +367,11 @@ MANUAL_DOCS = {
     "builtins.reversed": "https://docs.python.org/3.12/library/functions.html#reversed",
     "pytest.raises": "https://docs.pytest.org/en/stable/reference/reference.html#pytest.raises",
 }
+
+
+# 已改成「逐段教」的講義：主程式切成小段在正文講完，附錄的完整程式表格只寫「同上」
+STEPWISE_LESSONS = {"01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18"}
+
+
+def STEPWISE(lesson):
+    return lesson[:2] in STEPWISE_LESSONS

@@ -25,6 +25,17 @@ ROOT = Path(__file__).resolve().parent
 DEMO = re.compile(r"<!-- demo: ([\w.]+) -->\n```python\n(.*?)\n```", re.S)
 
 
+def locate_excerpt(code, snippet):
+    """節錄在完整 Demo 中的位置：(起始行號（0 起）, 縮排)。主程式那段在 Demo 裡縮 4 格，講義節錄時去掉縮排。
+    找不到回傳 None。"""
+    for indent in ("", "    ", "        "):
+        shifted = "\n".join(indent + line if line.strip() else line for line in snippet.split("\n"))
+        i = code.find(shifted)
+        if i >= 0 and (i == 0 or code[i - 1] == "\n"):
+            return code[:i].count("\n"), indent
+    return None
+
+
 def load_demo(lesson, file_dir=ROOT):
     """回傳 (檔名, 原始碼, namespace)。file_dir 讓測試能把 Demo 指到暫存資料夾。"""
     blocks = DEMO.findall((ROOT / lesson).read_text(encoding="utf-8"))
@@ -454,7 +465,31 @@ def test_walkthrough_excerpts_are_verbatim(lesson):
     (name, code), = DEMO.findall(text)
     for file, snippet in excerpts:
         assert file == name, f"節錄標的 {file} 與 Demo {name} 不同"
-        assert snippet in code, f"{lesson} 節錄與 Demo 不一致：\n{snippet[:200]}"
+        assert locate_excerpt(code, snippet) is not None, f"{lesson} 節錄與 Demo 不一致：\n{snippet[:200]}"
+
+
+STEPWISE = re.compile(r"每段一張圖")
+
+
+@pytest.mark.parametrize("lesson", sorted(p.name for p in ROOT.glob("[0-1][0-9]-*.md")))
+def test_stepwise_excerpts_cover_whole_demo(lesson):
+    """逐段教的講義（開頭註明「每段一張圖」）：正文各段節錄合起來，要涵蓋完整程式的每一行有內容的程式碼。
+    只有模組 docstring 與 `if __name__ == "__main__":` 這一行可以不講。"""
+    text = (ROOT / lesson).read_text(encoding="utf-8")
+    if not STEPWISE.search(text.split("\n## ")[0]):
+        pytest.skip("尚未改成逐段教")
+    (name, code), = DEMO.findall(text)
+    lines = code.split("\n")
+    covered = set()
+    for _, snippet in EXCERPT.findall(text):
+        start, _ = locate_excerpt(code, snippet)
+        covered |= set(range(start, start + snippet.count("\n") + 1))
+    doc_end = 0
+    if lines[0].startswith('"""'):
+        doc_end = next(i for i, l in enumerate(lines) if l.rstrip().endswith('"""') and (i or l.count('"""') >= 2)) + 1
+    missing = [i + 1 for i, l in enumerate(lines)
+               if i >= doc_end and l.strip() and i not in covered and l.strip() != 'if __name__ == "__main__":']
+    assert not missing, f"{lesson} 完整程式第 {missing[:10]} 行沒有在任何一段講到"
 
 
 @pytest.mark.parametrize("lesson", sorted(p.name for p in ROOT.glob("[0-1][0-9]-*.md")))

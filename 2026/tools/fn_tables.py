@@ -84,6 +84,16 @@ PREFER = {"agg": "pandas.api.typing.DataFrameGroupBy.agg", "describe": "pandas.D
 PANDASY = {"pandas.Series", "pandas.DataFrame"}
 
 
+def locate_excerpt(code, snippet):
+    """同 test_lessons.locate_excerpt：節錄可以是主程式去掉 4 格縮排後的樣子。"""
+    for indent in ("", "    ", "        "):
+        shifted = "\n".join(indent + line if line.strip() else line for line in snippet.split("\n"))
+        i = code.find(shifted)
+        if i >= 0 and (i == 0 or code[i - 1] == "\n"):
+            return code[:i].count("\n"), indent
+    return None
+
+
 def canon(key):
     return C.CANON.get(key, key)
 
@@ -476,7 +486,10 @@ class Course:
         if block["kind"] == "demo":
             offset = 0
         elif block["kind"] == "excerpt":
-            offset = src[:src.index(code)].count("\n")
+            loc = locate_excerpt(src, code)
+            if loc is None:
+                return [], [f"{lesson}：節錄與 Demo 不一致"]
+            offset = loc[0]
         else:
             offset = None
         nodes_by_line = {}
@@ -539,6 +552,9 @@ def cell(s):
 
 def render(rows, back, docs, indent):
     lines = [MARK, HEADER, "|---|---|---|"]
+    if rows is None:
+        lines.append("| （同上） | 這支程式用到的函式，都已在上面各段的表格介紹過 | — |")
+        return "".join(indent + ln + "\n" for ln in lines) + "\n"
     for k in rows:
         disp, desc = C.ENTRIES[k]
         lines.append(f"| {cell(disp)} | {cell(desc)} | [文件]({docs[k]}) |")
@@ -558,7 +574,12 @@ def plan(course=None):
         text = TABLE.sub("", p.read_text(encoding="utf-8"))
         nn = p.name[:2]
         tables = []
-        for b in blocks(text):
+        all_blocks = blocks(text)
+        stepwise = any(b["kind"] == "excerpt" for b in all_blocks) and C.STEPWISE(p.name)
+        for b in all_blocks:
+            if stepwise and b["kind"] == "demo":
+                tables.append((b, None, None))      # 逐段教過了：附錄完整程式只放一句話
+                continue
             keys, errs = course.block_keys(p.name, b)
             errors += errs
             new = [k for k, _ in keys if k not in first and k not in C.PRIOR]
@@ -566,6 +587,8 @@ def plan(course=None):
                 for k in new:
                     first[k] = nn
             back = [(k, C.PRIOR.get(k) or f"第 {first[k]} 節") for k, _ in keys if k not in new]
+            # 依「在哪裡介紹」再依短名排序：不受同一行內觀察順序影響（pandas 2／3 結果相同）
+            back.sort(key=lambda kv: (not kv[1].startswith("第"), kv[1], short(kv[0])))
             missing = [k for k in new + [k for k, _ in back] if k not in docs]
             errors += [f"{p.name}：沒有已驗證的文件網址 {k}" for k in missing]
             tables.append((b, new, back))
@@ -667,6 +690,9 @@ def main():
         new = build(text, tables, docs) if not errors or cmd == "check" and docs else None
         if cmd == "check":
             for b, nw, back in tables:
+                if nw is None:
+                    print(f"{name[:2]} {b['kind']:8} （同上）")
+                    continue
                 print(f"{name[:2]} {b['kind']:8} 新 {len(nw):2} 前面 {len(back):2}  {[short(k) for k in nw]}")
         elif cmd == "apply":
             (ROOT / name).write_text(new, encoding="utf-8")

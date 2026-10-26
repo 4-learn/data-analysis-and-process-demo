@@ -1,8 +1,6 @@
 # 13｜衍生欄位與可稽核規則
 
-> **正文初稿：2026-10-05｜對應新版資料處理與分析第 13 節：衍生欄位與可稽核規則。**
-> 本節把第 12 節的「每人違規次數」改成每人每週一列，再分級成 `risk_level`。重點不是「用哪個函式分級」，而是**分出來的等級，別人能不能檢查**：門檻寫在哪裡、邊界算哪一級、沒資料算哪一級、規則改了怎麼知道。
-> 本節不是特徵工程課——「哪些欄位適合拿去訓練模型」是機器學習課第 02 節的事；這裡只負責交出一份**有版本、有出處**的判定結果。
+> **2026-10-21 改版：每段一張圖。** 衍生欄位要可稽核：邊界明確、缺值有去處、規則有版本。
 
 [回 18 節課綱](../../course-plans/2026-10-data-analysis-18.md)
 
@@ -11,46 +9,167 @@
 - [demo：13_derived_rules.py](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/13_derived_rules.py)（與本頁 Demo 逐字相同）
 - 練習資料與環境說明：[2026/README](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026)
 
-## 學習目標與時間
+## 學完能做到
 
-完成後，你能：說出 `apply` 逐列 `if` 在本資料上分錯了哪些列、為什麼不會報錯；用 `np.select` 與 `pd.cut` 寫出邊界明確、缺值有去處的分級；說明 `qcut` 為什麼不能當判定規則；為一條規則輸出版本、門檻、資料期間與依據。
-
-| 時間 | 活動 | 產出 |
+| 時間 | 段落 | 學完能做到 |
 | --- | --- | --- |
-| 0–5 分鐘 | 衍生欄位不是原始資料 | 每人每週 240 列，32 列 NaN |
-| 5–14 分鐘 | `apply` 逐列 `if` | 240 列分錯 61 列，沒有錯誤訊息 |
-| 14–22 分鐘 | `np.select` 與 `pd.cut` | `right=True` 讓 0 次變 NaN |
-| 22–28 分鐘 | `qcut` 的問題 | 同樣 4 次，第 1 週「中」、第 2 週「高」 |
-| 28–35 分鐘 | 規則要有版本與出處 | 規則說明、`rule_version` 欄 |
-| 35–50 分鐘 | Workshop：改規則，交出差異 | risk-v2 與差異清單 |
+| 0–14 分 | 零、一 | 說出 `apply` 逐列 `if` 分錯了哪些列 |
+| 14–22 分 | 二 | 用 `np.select`、`pd.cut(right=False)` 寫清楚邊界 |
+| 22–28 分 | 三 | 說出 `qcut` 為什麼不適合當規則 |
+| 28–35 分 | 四、五 | 規則寫上版本、門檻、期間、出處 |
+| 35–50 分 | Workshop | 改規則，交出差異 |
 
-先修：本課第 08 節（缺值＝沒發生／沒記錄）、第 12 節（每人彙總、名冊補人）。環境同第 02 節。
+## 本節流程
 
-## 一、衍生欄位不是原始資料
-
-`risk_level` 不在任何一個上游檔案裡。它是**你**訂的規則算出來的：「一週違規 3 次以上算中、5 次以上算高」。攝影機沒有說過這句話，主管也沒有——這是一個決定。
-
-所以衍生欄位跟原始欄位有一個根本差別：**原始欄位錯了，可以回頭查來源；衍生欄位錯了，只能回頭查規則。**規則若只存在某個人的 `if` 裡，就沒有人能查。
-
-本節的表是「每人每週一列」：第 12 節的每人彙總，再依週切開；名冊 60 人 × 資料期間 4 週＝240 列。某人某週一次都沒被辨識到，`violations` 留 `NaN`，**不是 0**：
-
-```text
-每人每週 240 列（60 人 × 4 週）；violations 為 NaN 的 32 列（那一週沒被拍到）
+```mermaid
+flowchart TD
+    F[("events・event-types・workers")] --> W["weekly_counts()<br/>每人每週 240 列"]
+    W --> A["一 apply 逐列 if"]
+    W --> R["risk_level()<br/>np.select"]
+    W --> B["二 pd.cut 的 right"]
+    W --> C["三 qcut 門檻跟著跑"]
+    R --> D["四 describe_rule()<br/>五 交出去的表"]
+    style A fill:#fde2e1,stroke:#c0392b
+    style C fill:#fde2e1,stroke:#c0392b
+    style R fill:#ddf3e4,stroke:#27ae60,stroke-width:3px
 ```
 
-32 列是 W053–W060 的 8 人 × 4 週。0 次違規的意思是「拍到了，都有戴好」；NaN 的意思是「沒拍到，不知道」。這兩件事分級時必須去不同的地方。
+每段都是：**問題 → 位置（黃色）→ 步驟圖 → 程式 → 輸出 → 重點**。
 
-## 二、`apply` 逐列 `if`：錯在哪裡
+## 零、準備：規則與每人每週表
 
-舊教材與 AI 最常給的寫法（這段即 Demo 第 1 段裡的 `naive()`；單獨列出的這個區塊本節測試不涵蓋）：
+**問題：** 要分級的數字從哪裡來？
+
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：—"] --> C["零、準備"] --> N["接下來：一、二、三、四、五"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["事件去重、排除未辨識"] --> B["依週一分週"]
+    C["名冊 × 期間的週<br/>MultiIndex.from_product"] --> D["reindex"]
+    B --> D
+    D --> E["events：沒拍到＝0"]
+    D --> G["violations：沒拍到＝NaN"]
+    E --> H(["每人每週 240 列，32 列 NaN"])
+    G --> H
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class H good
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `pd.to_timedelta(s, unit="D")` | 數字轉成時間長度，`unit="D"` 表示單位是天 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.to_timedelta.html#pandas.to_timedelta) |
+| `pd.MultiIndex.from_product([清單1, 清單2], names=)` | 產生兩個清單的所有組合（例如每個人 × 每一週），用來補齊沒出現的格子 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.MultiIndex.from_product.html#pandas.MultiIndex.from_product) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`Path(__file__).resolve().parent`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve)（第 02 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`pd.read_csv()`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html#pandas.read_csv)（第 02 節）、[`pd.to_datetime()`](https://pandas.pydata.org/docs/reference/api/pandas.to_datetime.html#pandas.to_datetime)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 03 節）、[`pd.read_json()`](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json)（第 03 節）、[`.reset_index()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reset_index.html#pandas.DataFrame.reset_index)（第 04 節）、[`s.unique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.unique.html#pandas.Series.unique)（第 05 節）、[`.astype()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.astype.html#pandas.Series.astype)（第 06 節）、[`.fillna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.fillna.html#pandas.Series.fillna)（第 06 節）、[`s.max()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.max.html#pandas.Series.max)（第 06 節）、[`s.min()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.min.html#pandas.Series.min)（第 06 節）、[`s.str[a:b]`](https://pandas.pydata.org/docs/user_guide/text.html#indexing-with-str)（第 06 節）、[`整欄運算`](https://pandas.pydata.org/docs/user_guide/basics.html#flexible-binary-operations)（第 06 節）、[`.copy()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.copy.html#pandas.DataFrame.copy)（第 07 節）、[`s.isin()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isin.html#pandas.Series.isin)（第 07 節）、[`.drop_duplicates()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.drop_duplicates.html#pandas.DataFrame.drop_duplicates)（第 08 節）、[`pd.MultiIndex.from_arrays()`](https://pandas.pydata.org/docs/reference/api/pandas.MultiIndex.from_arrays.html#pandas.MultiIndex.from_arrays)（第 08 節）、[`.dayofweek`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.dayofweek.html#pandas.Series.dt.dayofweek)（第 10 節）、[`.strftime()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.strftime.html#pandas.Series.dt.strftime)（第 10 節）、[`.reindex()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html#pandas.DataFrame.reindex)（第 11 節）、[`groupby().agg()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.agg.html#pandas.api.typing.DataFrameGroupBy.agg)（第 12 節）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10） |
+
+<!-- 節錄: 13_derived_rules.py -->
+```python
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+DATA = Path(__file__).resolve().parent / "data"
+EVENTS = DATA / "events"
+
+RULE = {
+    "version": "risk-v1",
+    "decided": "2026-10-05",
+    "unit": "每人每週（週一～週六，台灣時間）已辨識、依 event_id 去重後的違規次數",
+    "levels": [("低", 0, 3), ("中", 3, 5), ("高", 5, None)],   # 下限含、上限不含
+    "no_data": "無資料",
+    "basis": "event-types.csv 的 is_violation；門檻為本課示範用，不是任何法規或公司規定",
+}
+
+
+def weekly_counts(events_path=EVENTS / "events.jsonl", types_path=EVENTS / "event-types.csv",
+                  roster_path=EVENTS / "workers.csv"):
+    """每人每週一列；以名冊 × 資料期間的週為骨架，沒被拍到的那一週留 NaN（不是 0）。"""
+    ev = pd.read_json(events_path, lines=True, dtype=False, convert_dates=False).drop_duplicates("event_id")
+    types = pd.read_csv(types_path, dtype=str, keep_default_na=False)
+    roster = pd.read_csv(roster_path, dtype=str, keep_default_na=False)
+    ev = ev[ev["worker_id"] != ""].copy()
+    ev["is_violation"] = ev["event_type"].isin(types.loc[types["is_violation"] == "true", "event_type"])
+    day = pd.to_datetime(ev["event_time"].str[:10], format="%Y-%m-%d")     # event_time 是工地當地時間
+    ev["week"] = (day - pd.to_timedelta(day.dt.dayofweek, unit="D")).dt.strftime("%Y-%m-%d")
+    grid = pd.MultiIndex.from_product([roster["worker_id"].drop_duplicates(), sorted(ev["week"].unique())],
+                                      names=["worker_id", "week"])
+    table = (ev.groupby(["worker_id", "week"])
+             .agg(events=("event_id", "size"), violations=("is_violation", "sum"))
+             .reindex(grid))
+    table["events"] = table["events"].fillna(0).astype("int64")    # 沒被拍到＝0 筆偵測；違規次數則是「不知道」
+    period = (ev["event_time"].min()[:10], ev["event_time"].max()[:10])
+    return table.reset_index(), types, period
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.isna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna)（第 03 節）、[`.nunique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html#pandas.Series.nunique)（第 05 節） |
+
+<!-- 節錄: 13_derived_rules.py -->
+```python
+table, types, period = weekly_counts()
+x = table["violations"]
+print(f"每人每週 {len(table)} 列（{table['worker_id'].nunique()} 人 × {table['week'].nunique()} 週）；"
+      f"violations 為 NaN 的 {int(x.isna().sum())} 列（那一週沒被拍到）\n")
+```
+
+- `RULE` 是一個 dict：版本、訂定日、計數單位、三級門檻（下限含、上限不含）。
+- 沒被拍到的那一週：偵測次數是 0，違規次數是「不知道」（NaN）。
+
+## 一、`apply` 逐列 `if`
+
+**問題：** 「3 次以上為中、5 次以上為高」，AI 的 `if` 鏈錯在哪？
+
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：零"] --> C["一、apply if"] --> N["接下來：二、三、四、五"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["n"] --> B{"n > 5？"}
+    B -- 是 --> H["高"]
+    B -- 否 --> C{"n > 3？"}
+    C -- 是 --> M["中"]
+    C -- 否 --> L["低"]
+    L --> X1(["剛好 3、5 次：降一級"])
+    L --> X2(["NaN：比較全是 False → 低"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class X1,X2 bad
+```
 
 <!-- fn-table -->
 | 函式名稱 | 說明 | 官方文件連結 |
 |---|---|---|
 | `.apply(函式)` | 對每個值（`DataFrame` 則是每一欄）套用函式 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.apply.html#pandas.Series.apply) |
-| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節） |
+| `df.values` | 去掉標籤，只留裡面的值（NumPy 陣列） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.values.html#pandas.DataFrame.values) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`pd.DataFrame()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame)（第 05 節）、[`np.nan`](https://numpy.org/doc/stable/reference/constants.html#numpy.nan)（第 08 節） |
 
+<!-- 節錄: 13_derived_rules.py -->
 ```python
+print("== 1. apply 逐列 if：邊界與 NaN ==")
+
 def naive(n):          # 需求：「3 次以上為中、5 次以上為高」
     if n > 5:
         return "高"
@@ -59,10 +178,16 @@ def naive(n):          # 需求：「3 次以上為中、5 次以上為高」
     else:
         return "低"
 
-table["naive"] = table["violations"].apply(naive)
+table["naive"] = x.apply(naive)
+table["risk_level"] = risk_level(x)
+probe = pd.DataFrame({"violations": [3.0, 5.0, np.nan]})
+probe["apply_if"] = probe["violations"].apply(naive)
+probe["np_select"] = risk_level(probe["violations"]).values
+print(probe.to_string(index=False))
+n_wrong, parts = error_breakdown(x, table["naive"], table["risk_level"])
+print(f"{len(table)} 列中分錯 {n_wrong} 列：邊界 3 或 5 次 {parts['邊界 3 或 5 次']} 列、NaN 變成「低」 {parts['NaN']} 列、"
+      f"其他 {parts['其他']} 列；沒有任何錯誤訊息")
 ```
-
-常聽到的批評是「`apply` 很慢」。在 240 列上，慢根本不是問題。**問題是它錯了，而且錯得很安靜**：
 
 ```text
 == 1. apply 逐列 if：邊界與 NaN ==
@@ -73,29 +198,106 @@ table["naive"] = table["violations"].apply(naive)
 240 列中分錯 61 列：邊界 3 或 5 次 29 列、NaN 變成「低」 32 列、其他 0 列；沒有任何錯誤訊息
 ```
 
-兩個錯，各自有來由：
+- 240 列分錯 61 列，**沒有錯誤訊息**。
+- `error_breakdown()` 拿實際分錯的列拆原因（在第二段的程式裡）。
 
-- **邊界**：需求說「3 次**以上**」，程式寫 `> 3`。剛好 3 次、剛好 5 次的人被降了一級——29 列。這種錯在 `if` 鏈裡很難看出來，因為門檻散在三行裡，每一行看起來都合理。
-- **NaN**：`NaN > 5` 是 `False`、`NaN > 3` 也是 `False`（第 08 節：NaN 的大小比較一律為 False），於是一路掉進 `else`，變成「低」。**沒被拍到的 8 個人，被標成低風險**。下游看到「低」，會以為這個人表現良好。
+## 二、`np.select` 與 `pd.cut` 的邊界
 
-就算把 `>` 改成 `>=`，NaN 的 32 列照樣變「低」（教師實測）。`if` 鏈的結構本身就是問題：**它一定有一個 `else`，任何沒想到的值都會被收進去**，而且不會告訴你。
+**問題：** 怎麼寫才不會錯邊界、不會吞掉 NaN？
 
-## 三、`np.select` 與 `pd.cut`：讓每一個值都有明確的去處
+**在流程中的位置：**
 
-### `np.select`：條件清單，對號入座
+```mermaid
+flowchart LR
+    P["已完成：零、一"] --> C["二、select／cut"] --> N["接下來：三、四、五"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
 
-`risk_level()` 把規則寫成一組條件與標籤，`np.select` 依序比對：
+**這段做了什麼：**
 
-- 第一條條件是 `x.isna()` → 「無資料」。缺值**先**被接住，不會落進任何一級。
-- 每一級寫成「下限含、上限不含」：`(x >= 3) & (x < 5)`。邊界只有一種寫法，不會有人寫 `>`、有人寫 `>=`。
-- `default="未分類"`，跑完檢查有沒有任何列是「未分類」——有就拋例外。`if` 鏈的 `else` 吞掉意外，這裡把意外變成錯誤。
-- 負數、非整數直接拒絕：違規次數不會是 -1 或 2.5，出現了代表上游壞了。
+```mermaid
+flowchart TD
+    A["risk_level()"] --> B{"負數或非整數？"}
+    B -- 是 --> B1(["ValueError"])
+    B -- 否 --> C["條件清單<br/>1. isna → 無資料<br/>2. 0 ≤ x < 3 → 低<br/>3. 3 ≤ x < 5 → 中<br/>4. x ≥ 5 → 高"]
+    C --> D["np.select(default=未分類)"] --> E{"有未分類？"}
+    E -- 有 --> E1(["ValueError"])
+    E -- 沒有 --> E2(["每列都有等級"])
+    G["pd.cut(right=True)"] --> G1(["0 次變 NaN、邊界錯"])
+    H["pd.cut(right=False)"] --> H1(["與 np.select 相同"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class B1,E1,G1 bad
+    class E2,H1 good
+```
 
-門檻不寫在函式裡，寫在 `RULE` 這個資料結構裡。要改門檻，改的是資料，不是程式邏輯——下一段的規則說明也從同一份 `RULE` 產生，**說明和實際執行的規則不可能不同步**。
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `np.select(條件清單, 結果清單, default=)` | 依序檢查條件，第一個成立的就給對應結果；都不成立給 `default` | [文件](https://numpy.org/doc/stable/reference/generated/numpy.select.html#numpy.select) |
+| `d.values()` | dict 所有的值 | [文件](https://docs.python.org/3.12/library/stdtypes.html#dict.values) |
+| `pd.cut(s, bins, right=, labels=)` | 依指定的分界把數字分組（例如 0–3 低、3–5 中）；`right=False` 是「含左不含右」 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.cut.html#pandas.cut) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 02 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 03 節）、[`.isna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna)（第 03 節）、[`.tolist()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.tolist.html)（第 04 節）、[`df.index`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.index.html#pandas.DataFrame.index)（第 05 節）、[`pd.Series()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.html#pandas.Series)（第 05 節）、[`.dropna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dropna.html#pandas.Series.dropna)（第 06 節）、[`整欄運算`](https://pandas.pydata.org/docs/user_guide/basics.html#flexible-binary-operations)（第 06 節）、[`s.isin()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isin.html#pandas.Series.isin)（第 07 節） |
 
-### `pd.cut`：預設的邊界跟你想的不一樣
+<!-- 節錄: 13_derived_rules.py -->
+```python
+def risk_level(violations, rule=RULE):
+    """依規則分級；NaN 一律標「無資料」，不能落進任何一級。"""
+    x = pd.Series(violations, dtype="float64")
+    if (x < 0).any():
+        raise ValueError(f"違規次數不可為負：{x[x < 0].tolist()[:3]}")
+    if (x.dropna() % 1 != 0).any():
+        raise ValueError("違規次數必須是整數")
+    conds, labels = [x.isna()], [rule["no_data"]]
+    for label, low, high in rule["levels"]:
+        conds.append((x >= low) & (x < high) if high is not None else (x >= low))
+        labels.append(label)
+    out = np.select(conds, labels, default="未分類")
+    if (out == "未分類").any():
+        raise ValueError(f"規則沒有涵蓋：{x[out == '未分類'].tolist()[:3]}")
+    return pd.Series(out, index=x.index, name="risk_level")
 
-`pd.cut` 是專門做分級的函式，但它的預設是 `right=True`：區間**左開右閉** `(0, 3]`。同一組門檻 `[0, 3, 5, inf]`：
+
+def error_breakdown(x, got, expected):
+    """拿「實際分錯的列」拆原因，不是拿「值剛好在邊界的列」去湊。"""
+    wrong = pd.Series(got, index=x.index) != pd.Series(expected, index=x.index)
+    parts = {"邊界 3 或 5 次": int((wrong & x.isin([3, 5])).sum()), "NaN": int((wrong & x.isna()).sum())}
+    parts["其他"] = int(wrong.sum()) - sum(parts.values())
+    return int(wrong.sum()), parts
+
+
+def cut_counts(x, bins, right, labels=("低", "中", "高")):
+    """pd.cut 的各級列數；「其中 0 次」是 NaN 且原值為 0 的列，實際算出來，不是猜。"""
+    c = pd.cut(x, bins, right=right, labels=list(labels))
+    counts = {lb: int((c == lb).sum()) for lb in labels}
+    counts["NaN"] = int(c.isna().sum())
+    counts["0 次"] = int((c.isna() & (x == 0)).sum())
+    return counts
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `np.inf` | 無限大；常當最後一個分組的上限 | [文件](https://numpy.org/doc/stable/reference/constants.html#numpy.inf) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`pd.DataFrame()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame)（第 05 節）、[`.all()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.all.html#pandas.Series.all)（第 06 節）、[`.astype()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.astype.html#pandas.Series.astype)（第 06 節）、[`.fillna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.fillna.html#pandas.Series.fillna)（第 06 節）、[`pd.cut()`](https://pandas.pydata.org/docs/reference/api/pandas.cut.html#pandas.cut)（第 13 節） |
+
+<!-- 節錄: 13_derived_rules.py -->
+```python
+print("\n== 2. pd.cut 的 right：同一組門檻，兩種邊界 ==")
+bins = [0, 3, 5, np.inf]
+probe = pd.DataFrame({"violations": [0, 2, 3, 4, 5, 24]})
+for right in (True, False):
+    probe[f"right={right}"] = pd.cut(probe["violations"], bins, right=right,
+                                     labels=["低", "中", "高"]).astype(object).fillna("NaN")
+print(probe.to_string(index=False))
+for right in (True, False):
+    k = cut_counts(x, bins, right)
+    print(f"right={right!s:5}：低 {k['低']}、中 {k['中']}、高 {k['高']}、NaN {k['NaN']}（其中 0 次的 {k['0 次']} 列）")
+same = pd.cut(x, bins, right=False, labels=["低", "中", "高"]).astype(object).fillna("無資料")
+print(f"right=False 與 np.select 結果相同：{bool((same == table['risk_level']).all())}")
+```
 
 ```text
 == 2. pd.cut 的 right：同一組門檻，兩種邊界 ==
@@ -111,14 +313,57 @@ right=False：低 154、中 39、高 15、NaN 32（其中 0 次的 0 列）
 right=False 與 np.select 結果相同：True
 ```
 
-- `right=True`（預設）：3 次算「低」、5 次算「中」——跟第二段 `apply` 的錯法一模一樣。更糟的是 **0 次變成 NaN**：`(0, 3]` 不包含 0。「整週都戴好安全帽」的 44 列，跟「沒拍到」的 32 列混在一起，一共 76 個 NaN。
-- `right=False`：區間 `[0, 3)`，「下限含、上限不含」，結果與 `np.select` 完全相同。
+- 缺值**先**接住；每一級「下限含、上限不含」。
+- `pd.cut` 的預設值不是你的規則：`right` 要明寫。
 
-**`pd.cut` 不是錯的工具，但它的預設值不是你的規則。**用它時把 `right` 明寫出來，並且像 `np.select` 一樣，事後檢查 NaN 的數量是不是剛好等於原本的缺值數。
+## 三、`qcut`：門檻跟著資料跑
 
-## 四、`qcut`：門檻跟著資料跑
+**問題：** 依分位數分級，有什麼問題？
 
-`pd.qcut` 依「分位數」切：例如前 50% 算低、50–90% 算中、最高 10% 算高。不用自己想門檻，看起來很方便。每一週各自 `qcut`：
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：零、一、二"] --> C["三、qcut"] --> N["接下來：四、五"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["每週各自 qcut"] --> B["第 1 週門檻 3.9"] --> B1(["4 次：中"])
+    A --> C["第 2 週門檻 1.5"] --> C1(["4 次：高"])
+    A --> D(["整個工地都變安全，也一樣有人是高"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class C1,D bad
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `pd.qcut(s, q, labels=, retbins=)` | 依**分位數**分組（每組人數差不多）；`retbins=True` 同時回傳實際分界 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.qcut.html#pandas.qcut) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節）、[`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`pd.concat()`](https://pandas.pydata.org/docs/reference/api/pandas.concat.html#pandas.concat)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 03 節）、[`df.index`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.index.html#pandas.DataFrame.index)（第 05 節）、[`pd.DataFrame()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame)（第 05 節）、[`.astype()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.astype.html#pandas.Series.astype)（第 06 節）、[`.dropna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dropna.html#pandas.Series.dropna)（第 06 節） |
+
+<!-- 節錄: 13_derived_rules.py -->
+```python
+print("\n== 3. qcut：門檻跟著資料跑 ==")
+q = [0, 0.5, 0.9, 1]
+rows, by_qcut = [], []
+for week, grp in table.dropna(subset=["violations"]).groupby("week"):
+    cats, edges = pd.qcut(grp["violations"], q, labels=["低", "中", "高"], retbins=True)
+    by_qcut.append(cats.astype(str))
+    lookup = dict(zip(grp["violations"], cats.astype(str)))
+    rows.append({"week": week, "門檻": [round(float(e), 1) for e in edges],
+                 "2 次": lookup.get(2.0, "-"), "4 次": lookup.get(4.0, "-"), "高的人數": int((cats == "高").sum())})
+print(pd.DataFrame(rows).to_string(index=False))
+by_qcut = pd.concat(by_qcut)
+differ = by_qcut != table.loc[by_qcut.index, "risk_level"]
+print(f"每週各自 qcut 與固定規則 risk-v1 相比：{len(by_qcut)} 列中 {int(differ.sum())} 列等級不同")
+```
 
 ```text
 == 3. qcut：門檻跟著資料跑 ==
@@ -130,15 +375,64 @@ right=False 與 np.select 結果相同：True
 每週各自 qcut 與固定規則 risk-v1 相比：208 列中 33 列等級不同
 ```
 
-- **同樣是一週違規 4 次**：第 1 週「中」、第 2 週「高」、第 3 週「中」、第 4 週「高」。同樣 2 次，有兩週是「中」、兩週是「低」。
-- 門檻 `3.9`、`1.5` 不是任何人訂的數字，是分位數內插出來的。被問「為什麼他是高風險」，你只能回答「因為他比這週 90% 的人多」——**跟他自己做了什麼無關，跟別人做了什麼有關**。
-- 「高」的人數也不由行為決定：分位數保證大約固定比例的人會是高，整個工地都變安全了，也一樣有人是「高」。
+- 門檻是內插出來的，**不是任何人訂的**；被問「為什麼他是高」答不出來。
 
-`qcut` 適合回答「這個人在這群人裡排第幾」（描述），不適合當「這個人要不要被約談」的判定規則。判定規則的門檻必須**事先訂好、寫下來、不隨資料變動**，才能稽核。
+## 四、規則說明
 
-## 五、規則要有版本與出處
+**問題：** 交出去的分級，要附上什麼？
 
-可稽核的意思是：拿到結果的人，**不看程式**也能知道每一個等級是怎麼來的，而且能自己重算一遍。`describe_rule()` 從 `RULE` 和 `event-types.csv` 產生一段說明，跟結果一起交出去：
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：零、一、二、三"] --> C["四、規則說明"] --> N["接下來：五"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["describe_rule()"] --> B["版本 risk-v1・訂定日<br/>計數單位・資料期間<br/>每級門檻・無資料的意思<br/>違規類型 → 法規條文"]
+    B --> G(["別人看得懂、查得到"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class G good
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`df.itertuples()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.itertuples.html#pandas.DataFrame.itertuples)（第 04 節） |
+
+<!-- 節錄: 13_derived_rules.py -->
+```python
+def describe_rule(rule, types, period):
+    lines = [f"規則 {rule['version']}（{rule['decided']} 訂定）",
+             f"計數單位：{rule['unit']}",
+             f"資料期間：{period[0]} ～ {period[1]}"]
+    for label, low, high in rule["levels"]:
+        lines.append(f"  {label}：{low} 次以上" + (f"、未滿 {high} 次" if high is not None else ""))
+    lines.append(f"  {rule['no_data']}：該週沒有被辨識到任何事件（不是 0 次）")
+    lines.append("計入的違規類型與依據（營造安全衛生設施標準，練習站條文，不具法律效力）：")
+    for r in types[types["is_violation"] == "true"].itertuples():
+        lines.append(f"  {r.event_type}（{r.label_zh}）→ {r.pcode} 第 {r.slug} 條：{r.basis}")
+    lines.append(f"門檻依據：{rule['basis']}")
+    return "\n".join(lines)
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| （無） | 本段只用到 Python 基礎與前幾門課學過的寫法，沒有新的函式 | — |
+
+<!-- 節錄: 13_derived_rules.py -->
+```python
+print("\n== 4. 規則說明：版本、門檻、資料期間、出處 ==")
+print(describe_rule(RULE, types, period))
+```
 
 ```text
 == 4. 規則說明：版本、門檻、資料期間、出處 ==
@@ -156,32 +450,115 @@ right=False 與 np.select 結果相同：True
 門檻依據：event-types.csv 的 is_violation；門檻為本課示範用，不是任何法規或公司規定
 ```
 
-一段規則說明至少要回答五件事：
+- 門檻是本課示範用，**不是法規或公司規定**——說明裡要寫明。
 
-| 問題 | 本例 |
-| --- | --- |
-| 哪一版？ | `risk-v1`，2026-10-05 訂定；結果表每一列都帶 `rule_version` |
-| 算的是什麼？ | 計數單位：每人每週、已辨識、去重後 |
-| 邊界算哪邊？ | 「以上」「未滿」，不是「大於」「到」 |
-| 沒資料算什麼？ | 「無資料」，獨立一級 |
-| 依據是什麼？ | 違規類型對到法條（`pcode`＋`slug`，第 14 節會接上條文原文）；**門檻本身沒有法規依據**，這一點要直接寫出來 |
+## 五、交出去的表
 
-最後一條最容易被省略。法條規定「應戴安全帽」，沒有規定「一週 5 次算高風險」。把門檻寫得像是法規要求，是把自己的決定偽裝成別人的。
+**問題：** 最後的表長什麼樣？
 
-以下為完整 `13_derived_rules.py`，只讀 `data/events/`，不寫檔、不連線。
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：零、一、二、三、四"] --> C["五、交出去"] --> N["接下來：—"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["每人每週"] --> B["risk_level"]
+    A --> C["rule_version"]
+    B --> D(["低 154・中 39・高 15・無資料 32"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class D good
+```
 
 <!-- fn-table -->
 | 函式名稱 | 說明 | 官方文件連結 |
 |---|---|---|
-| `pd.to_timedelta(s, unit="D")` | 數字轉成時間長度，`unit="D"` 表示單位是天 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.to_timedelta.html#pandas.to_timedelta) |
-| `pd.MultiIndex.from_product([清單1, 清單2], names=)` | 產生兩個清單的所有組合（例如每個人 × 每一週），用來補齊沒出現的格子 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.MultiIndex.from_product.html#pandas.MultiIndex.from_product) |
-| `np.select(條件清單, 結果清單, default=)` | 依序檢查條件，第一個成立的就給對應結果；都不成立給 `default` | [文件](https://numpy.org/doc/stable/reference/generated/numpy.select.html#numpy.select) |
-| `d.values()` | dict 所有的值 | [文件](https://docs.python.org/3.12/library/stdtypes.html#dict.values) |
-| `pd.cut(s, bins, right=, labels=)` | 依指定的分界把數字分組（例如 0–3 低、3–5 中）；`right=False` 是「含左不含右」 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.cut.html#pandas.cut) |
-| `df.values` | 去掉標籤，只留裡面的值（NumPy 陣列） | [文件](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.values.html#pandas.DataFrame.values) |
-| `np.inf` | 無限大；常當最後一個分組的上限 | [文件](https://numpy.org/doc/stable/reference/constants.html#numpy.inf) |
-| `pd.qcut(s, q, labels=, retbins=)` | 依**分位數**分組（每組人數差不多）；`retbins=True` 同時回傳實際分界 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.qcut.html#pandas.qcut) |
-| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`Path(__file__).resolve().parent`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve)（第 02 節）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10）、[`pd.read_json()`](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json)（第 03 節）、[`.drop_duplicates()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.drop_duplicates.html#pandas.DataFrame.drop_duplicates)（第 08 節）、[`pd.read_csv()`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html#pandas.read_csv)（第 02 節）、[`.copy()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.copy.html#pandas.DataFrame.copy)（第 07 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 03 節）、[`s.isin()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isin.html#pandas.Series.isin)（第 07 節）、[`pd.to_datetime()`](https://pandas.pydata.org/docs/reference/api/pandas.to_datetime.html#pandas.to_datetime)（第 02 節）、[`s.str[a:b]`](https://pandas.pydata.org/docs/user_guide/text.html#indexing-with-str)（第 06 節）、[`整欄運算`](https://pandas.pydata.org/docs/user_guide/basics.html#flexible-binary-operations)（第 06 節）、[`.dayofweek`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.dayofweek.html#pandas.Series.dt.dayofweek)（第 10 節）、[`.strftime()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.strftime.html#pandas.Series.dt.strftime)（第 10 節）、[`pd.MultiIndex.from_arrays()`](https://pandas.pydata.org/docs/reference/api/pandas.MultiIndex.from_arrays.html#pandas.MultiIndex.from_arrays)（第 08 節）、[`s.unique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.unique.html#pandas.Series.unique)（第 05 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節）、[`.reindex()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html#pandas.DataFrame.reindex)（第 11 節）、[`groupby().agg()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.agg.html#pandas.api.typing.DataFrameGroupBy.agg)（第 12 節）、[`.astype()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.astype.html#pandas.Series.astype)（第 06 節）、[`.fillna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.fillna.html#pandas.Series.fillna)（第 06 節）、[`s.max()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.max.html#pandas.Series.max)（第 06 節）、[`s.min()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.min.html#pandas.Series.min)（第 06 節）、[`.reset_index()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reset_index.html#pandas.DataFrame.reset_index)（第 04 節）、[`pd.Series()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.html#pandas.Series)（第 05 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 02 節）、[`.tolist()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.tolist.html)（第 04 節）、[`.dropna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dropna.html#pandas.Series.dropna)（第 06 節）、[`.isna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna)（第 03 節）、[`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 03 節）、[`df.index`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.index.html#pandas.DataFrame.index)（第 05 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`df.itertuples()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.itertuples.html#pandas.DataFrame.itertuples)（第 04 節）、[`.nunique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html#pandas.Series.nunique)（第 05 節）、[`.apply()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.apply.html#pandas.Series.apply)（第 13 節）、[`np.nan`](https://numpy.org/doc/stable/reference/constants.html#numpy.nan)（第 08 節）、[`pd.DataFrame()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame)（第 05 節）、[`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`.all()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.all.html#pandas.Series.all)（第 06 節）、[`pd.concat()`](https://pandas.pydata.org/docs/reference/api/pandas.concat.html#pandas.concat)（第 02 節）、[`s.value_counts()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.value_counts.html#pandas.Series.value_counts)（第 05 節） |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`s.value_counts()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.value_counts.html#pandas.Series.value_counts)（第 05 節）、[`.reindex()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reindex.html#pandas.DataFrame.reindex)（第 11 節） |
+
+<!-- 節錄: 13_derived_rules.py -->
+```python
+print("\n== 5. 交出去的表 ==")
+table["rule_version"] = RULE["version"]
+out = table[["worker_id", "week", "events", "violations", "risk_level", "rule_version"]]
+print(out["risk_level"].value_counts().reindex(["低", "中", "高", "無資料"]).to_string())
+print(out[out["worker_id"] == "W041"].to_string(index=False))
+```
+
+```text
+== 5. 交出去的表 ==
+risk_level
+低      154
+中       39
+高       15
+無資料     32
+worker_id       week  events  violations risk_level rule_version
+     W041 2026-08-31       6         2.0          低      risk-v1
+     W041 2026-09-07      12         4.0          中      risk-v1
+     W041 2026-09-14      17         6.0          高      risk-v1
+     W041 2026-09-21      32        24.0          高      risk-v1
+```
+
+- 每一列都有等級，「無資料」單獨一類。
+- W041：低、中、高、高。等級看得出「變糟了」，看不出「為什麼」。
+
+## Workshop：改規則，交出差異
+
+### 任務與時間
+
+**35–42 分鐘：發布 risk-v2。** 安全主管要求收緊：「2 次以上為中、4 次以上為高」。複製 `RULE`，改成 `risk-v2`，重新分級，並輸出新的規則說明。
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節） |
+
+```python
+# Workshop 起手式，本節測試不涵蓋這段
+table, types, period = weekly_counts()
+table["v1"] = risk_level(table["violations"])
+v2 = dict(RULE, version="risk-v2", levels=[("低", 0, 2), ("中", 2, 4), ("高", 4, None)])
+table["v2"] = risk_level(table["violations"], v2)
+```
+
+**42–46 分鐘：交出差異。** 有幾列的等級變了？用 `pd.crosstab(table["v1"], table["v2"])` 看它們從哪裡移到哪裡。「無資料」有沒有變？應不應該變？
+
+**46–50 分鐘：抓 AI 的錯。** 請 OpenCode 寫「依每週違規次數產生 risk_level：3 次以上中、5 次以上高」。拿它的程式跑本節的 240 列，檢查三件事：剛好 3 次、5 次的人是哪一級？W053 是哪一級？有沒有一段文字說明規則版本與門檻？
+
+### 參考判讀
+
+:::spoiler 教師用（點開）
+- risk-v2 下，**67 列**等級改變；分布為低 101、中 78、高 29、無資料 32（教師實測）。「無資料」32 列不變——門檻怎麼改，沒拍到的人都不該被分到任何一級。
+- 若你的 v2 讓「無資料」變少，代表你的程式在某一步把 NaN 補成了 0。教師實測：先 `fillna(0)` 再分級，v1 的「低」從 154 變 186。
+- 常見的 AI 版本是 `apply` ＋ `if n >= 5 … elif n >= 3 … else`：邊界對了，但 W053–W060 的 32 列被標成「低」（教師實測 240 列中錯 32 列）；或是 `pd.cut(x, [0, 3, 5, inf])` 沒寫 `right`：3 次算低、0 次變 NaN。**兩種都不會報錯**。
+- AI 幾乎不會主動輸出規則說明。沒有版本的分級結果，下週門檻改了，沒有人分得出哪些「高」是舊規則判的。
+:::
+
+### 驗收
+
+- `risk_level` **不得以 `apply` 逐列判斷實作**；用 `np.select` 或 `pd.cut(right=False)`。
+- 240 列每一列都有等級；NaN 的列是「無資料」，數量等於原本的缺值數（32）。
+- 交出 risk-v2 的規則說明，五個問題（版本、單位、邊界、無資料、依據）都有回答，且寫明門檻沒有法規依據。
+- 交出 v1 → v2 的差異列數與 crosstab，並能解釋為什麼「無資料」不變。
+- 能說出 `qcut` 為什麼不能當判定規則（同樣 4 次，不同週不同級）。
+
+## 附錄：完整程式
+
+```bash
+python3 13_derived_rules.py
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| （同上） | 這支程式用到的函式，都已在上面各段的表格介紹過 | — |
 
 <!-- demo: 13_derived_rules.py -->
 ```python
@@ -336,74 +713,9 @@ if __name__ == "__main__":
     print(out[out["worker_id"] == "W041"].to_string(index=False))
 ```
 
-執行（在本目錄下）：
-
-```bash
-python3 13_derived_rules.py
-```
-
-最後一段：
-
-```text
-== 5. 交出去的表 ==
-risk_level
-低      154
-中       39
-高       15
-無資料     32
-worker_id       week  events  violations risk_level rule_version
-     W041 2026-08-31       6         2.0          低      risk-v1
-     W041 2026-09-07      12         4.0          中      risk-v1
-     W041 2026-09-14      17         6.0          高      risk-v1
-     W041 2026-09-21      32        24.0          高      risk-v1
-```
-
-讀它的方式：
-
-- 154＋39＋15＋32＝240，**每一列都有等級**，「無資料」單獨一類。
-- W041 四週依序是低、中、高、高。第 4 週 24 次中有 18 次是 09-22 下午連續發生的（第 12 節）——等級看得出「他變糟了」，看不出「那是一個下午的事」。這是第 15 節要處理的。
-- `events` 是整數、`violations` 是浮點數：沒被拍到的那一週，偵測次數確實是 0，違規次數卻是「不知道」。浮點數是因為 NaN，不是寫錯。
-
-## Workshop：改規則，交出差異
-
-### 任務與時間
-
-**35–42 分鐘：發布 risk-v2。** 安全主管要求收緊：「2 次以上為中、4 次以上為高」。複製 `RULE`，改成 `risk-v2`，重新分級，並輸出新的規則說明。
-
-<!-- fn-table -->
-| 函式名稱 | 說明 | 官方文件連結 |
-|---|---|---|
-| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節） |
-
-```python
-# Workshop 起手式，本節測試不涵蓋這段
-table, types, period = weekly_counts()
-table["v1"] = risk_level(table["violations"])
-v2 = dict(RULE, version="risk-v2", levels=[("低", 0, 2), ("中", 2, 4), ("高", 4, None)])
-table["v2"] = risk_level(table["violations"], v2)
-```
-
-**42–46 分鐘：交出差異。** 有幾列的等級變了？用 `pd.crosstab(table["v1"], table["v2"])` 看它們從哪裡移到哪裡。「無資料」有沒有變？應不應該變？
-
-**46–50 分鐘：抓 AI 的錯。** 請 OpenCode 寫「依每週違規次數產生 risk_level：3 次以上中、5 次以上高」。拿它的程式跑本節的 240 列，檢查三件事：剛好 3 次、5 次的人是哪一級？W053 是哪一級？有沒有一段文字說明規則版本與門檻？
-
-### 參考判讀
-
-- risk-v2 下，**67 列**等級改變；分布為低 101、中 78、高 29、無資料 32（教師實測）。「無資料」32 列不變——門檻怎麼改，沒拍到的人都不該被分到任何一級。
-- 若你的 v2 讓「無資料」變少，代表你的程式在某一步把 NaN 補成了 0。教師實測：先 `fillna(0)` 再分級，v1 的「低」從 154 變 186。
-- 常見的 AI 版本是 `apply` ＋ `if n >= 5 … elif n >= 3 … else`：邊界對了，但 W053–W060 的 32 列被標成「低」（教師實測 240 列中錯 32 列）；或是 `pd.cut(x, [0, 3, 5, inf])` 沒寫 `right`：3 次算低、0 次變 NaN。**兩種都不會報錯**。
-- AI 幾乎不會主動輸出規則說明。沒有版本的分級結果，下週門檻改了，沒有人分得出哪些「高」是舊規則判的。
-
-### 驗收
-
-- `risk_level` **不得以 `apply` 逐列判斷實作**；用 `np.select` 或 `pd.cut(right=False)`。
-- 240 列每一列都有等級；NaN 的列是「無資料」，數量等於原本的缺值數（32）。
-- 交出 risk-v2 的規則說明，五個問題（版本、單位、邊界、無資料、依據）都有回答，且寫明門檻沒有法規依據。
-- 交出 v1 → v2 的差異列數與 crosstab，並能解釋為什麼「無資料」不變。
-- 能說出 `qcut` 為什麼不能當判定規則（同樣 4 次，不同週不同級）。
-
 ## 教師紀錄與下一步
 
+:::spoiler 實測環境、版本差異、資料來源（點開）
 **實測**：2026-10-05，Ubuntu 20.04，Python 3.11.8，pandas 3.0.6、numpy 2.4.6。本頁輸出為該環境實際執行貼上（**本機實測**）。另以 Python 3.10.15／pandas 2.3.3 執行，Demo **標準輸出逐字相同**；Workshop 參考判讀的數字兩版相同。兩版都實測過：`pd.cut` 預設 `right=True` 讓左端點 0 變 NaN；`qcut` 以 `[0, 0.5, 0.9, 1]` 切本資料四週皆不需 `duplicates="drop"`。
 
 **資料**：同第 12 節，合成資料，不代表任何真實工地。門檻 3／5 次為**示範用**，不是任何法規、標準或公司規定；違規類型對應的法條取自練習站 `articles.jsonl`，可能經刻意修改，不具法律效力。週以 `event_time` 的當地日期計算（週一起算，週日停工）。
@@ -418,5 +730,6 @@ table["v2"] = risk_level(table["violations"], v2)
 **界線**：本節不談「門檻該訂多少」——那需要現場與安全主管的判斷，不是資料能決定的。`np.select` 在大資料上比 `apply` 快，但本節**沒有做速度比較**，也不以速度當論點。本節**尚未實班試教**。
 
 **舊教材**：改寫自 [新增衍生欄位（風險分數、等級）](https://hackmd.io/@yillkid/B1904jR4-l)。保留「衍生欄位不是原始資料、是定義規則後算出來的」與「一整欄一起算」；舊版的 `apply(risk_level)` 改為**反例**，並實測它在本資料的邊界與 NaN 錯誤；`risk_score = fail_count` 這一步（把一欄複製成另一欄）刪除；「對 AI 模型來說這是 Feature Engineering 的第一步」的論述**換成「可稽核的判定規則」**，特徵工程交給 ML 課。[DataFrame 合併與操作](https://hackmd.io/@yillkid/SJENzeiEc) 的運算部分（`subtract` 兩表相減）不採用：它示範的是 index 對齊的算術，與分級無關；本節 Workshop 的 v1／v2 比較改用 `crosstab`。`np.select`、`pd.cut`、`qcut`、規則說明與版本皆為新增。
+:::
 
 **下一節**：第 14 節〈跨來源合併與 fan-out〉——規則說明裡的「N0060014 第 19 條」只是一個代碼。下一節把事件、名冊、事件類型、法條原文四份資料接起來，並看 W023 的兩列名冊會讓數字翻倍到什麼程度。
