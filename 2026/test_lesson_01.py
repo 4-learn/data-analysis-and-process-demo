@@ -14,7 +14,7 @@ def test_01_output_matches_lesson():
         for old, new in PANDAS2_DIFFS:
             out = out.replace(old, new)
     blocks = [b for b in pasted_blocks(LESSON) if b.startswith("== ")]
-    assert len(blocks) == 3
+    assert len(blocks) == 4   # 2026-10-21 改成每段一張圖：輸出 1–4 段各自貼在對應段落
     for b in blocks:
         assert b in out, b[:300]
 
