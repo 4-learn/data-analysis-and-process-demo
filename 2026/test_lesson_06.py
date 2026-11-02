@@ -1,17 +1,20 @@
-import io
 import sys
+import time
+import warnings
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_lessons import ROOT, load_demo, run_main, pasted_blocks  # noqa: E402
 import pandas as pd, pytest  # noqa: E402
 
-LESSON = "06-explore.md"
+LESSON = "06-event-row.md"
+# pandas 2.3.3 concat 時略過全缺值的單列表來決定型別（FutureWarning），3.0.6 不略過 → object。見講義教師紀錄。
 PANDAS2_DIFFS = [
-    ("dtypes：{'object': 7}", "dtypes：{'str': 7}"),
-    ("info()：5   信心度     629 non-null    object", "info()：5   信心度     629 non-null    str"),
-    ("info()：dtypes: object(7)", "info()：dtypes: str(7)"),
+    ("事後 pd.concat(frames)：confidence=float64", "事後 pd.concat(frames)：confidence=object"),
+    ("迴圈累積的 confidence=float64；數值欄 select_dtypes('number')=['confidence']",
+     "迴圈累積的 confidence=object；數值欄 select_dtypes('number')=[]"),
 ]
+PANDAS3 = int(pd.__version__.split(".")[0]) >= 3
 
 
 @pytest.fixture(scope="module")
@@ -20,10 +23,11 @@ def d06():
 
 
 @pytest.fixture(scope="module")
-def raw(d06):
-    return d06["read_raw"](d06["EXPORT"])
+def first200(d06):
+    return d06["load_records"](d06["EVENTS"], 200)
 
 
+@pytest.mark.filterwarnings("ignore::FutureWarning")
 def test_06_output_matches_lesson():
     out = run_main(LESSON)
     if int(pd.__version__.split(".")[0]) < 3:
@@ -35,89 +39,96 @@ def test_06_output_matches_lesson():
         assert b in out, b[:300]
 
 
-def test_06_naive_read_has_no_numeric_column_and_describe_falls_back(d06):
-    naive = pd.read_csv(d06["EXPORT"])
-    assert naive.shape == (692, 7)
-    assert naive.select_dtypes("number").empty
-    assert naive.describe().index.tolist() == ["count", "unique", "top", "freq"]
-    with pytest.raises(ValueError):
-        naive.describe(include="number")
-    with pytest.raises(TypeError):
-        naive["信心度"].mean()
+@pytest.mark.filterwarnings("ignore::FutureWarning")
+def test_06_concat_in_loop_breaks_index_and_counts_copies(d06, first200):
+    df, calls, copied = d06["concat_in_loop"](first200)
+    assert len(df) == 200 and calls == 200
+    assert copied == 200 * 201 // 2 == 20100
+    assert not df.index.is_unique and (df.index == 0).all()
+    assert len(df.loc[0]) == 200
+    # 計數本身是對的——「計數對、表是壞的」
+    assert df.groupby("event_type").size().to_dict() == {
+        "no_harness": 7, "no_helmet": 18, "ppe_ok": 169, "restricted_entry": 6}
+    assert df["confidence"].dtype == (object if PANDAS3 else "float64")
 
 
-def test_06_default_na_list_eats_NA_but_not_unrecognized(d06, raw):
-    naive = pd.read_csv(d06["EXPORT"])
-    assert naive["信心度"].isna().sum() == 63 and naive["人員"].isna().sum() == 0
-    assert (naive["人員"] == "未辨識").sum() == 92
-    assert raw.isna().sum().sum() == 0
-    assert (raw["信心度"] == "N/A").sum() == 63
+@pytest.mark.filterwarnings("ignore::FutureWarning")
+def test_06_concat_in_loop_is_much_slower(d06, first200):
+    """講義宣稱慢 100 倍以上（教師本機）；測試只斷言保守的 10 倍，避免在慢機器上抖動。"""
+    t = time.perf_counter()
+    d06["concat_in_loop"](first200)
+    loop = time.perf_counter() - t
+    t = time.perf_counter()
+    for _ in range(5):
+        d06["build_table"](first200)
+    once = (time.perf_counter() - t) / 5
+    assert loop > 10 * once
 
 
-def test_06_coerce_silently_destroys_column(d06):
-    naive = pd.read_csv(d06["EXPORT"])
-    coerced = pd.to_numeric(naive["信心度"], errors="coerce")
-    assert coerced.isna().all()
+def test_06_build_table_contract(d06, first200):
+    df = d06["build_table"](first200)
+    assert df.shape == (200, 12) and df.index.is_unique
+    assert list(df.columns) == d06["SCHEMA"]
+    assert df["confidence"].dtype == "float64" and df["confidence"].isna().sum() == 15
+    assert df["worker_id"].map(type).eq(str).all()
 
 
-def test_06_missing_is_concentrated_on_cam08(raw):
-    na = raw["信心度"] == "N/A"
-    assert set(raw.loc[na, "攝影機"]) == {"cam-08"}
-    assert na.sum() == (raw["攝影機"] == "cam-08").sum() == 63
-    unknown = raw.loc[raw["人員"] == "未辨識", "區域"].value_counts().to_dict()
-    assert unknown == {"出入口": 24, "施工架": 20, "鋼構組立": 28, "開挖區": 20}
-
-
-def test_06_parse_confidence_values(d06, raw):
-    conf = d06["parse_confidence"](raw["信心度"])
-    assert conf.notna().sum() == 629 and conf.min() == 0.35 and conf.max() == 0.99
-    assert round(conf.mean(), 3) == 0.774 and round(conf.fillna(0).mean(), 3) == 0.704
-
-
-@pytest.mark.parametrize("value, message", [
-    ("87", "無法解讀"), ("0.87", "無法解讀"), ("高", "無法解讀"), ("", "無法解讀"),
-    ("120%", "超過 100%"),
+@pytest.mark.parametrize("breakage, message", [
+    (lambda r: {k: v for k, v in r.items() if k != "zone"}, r"缺少 \['zone'\]"),
+    (lambda r: {**r, "zone_name": "出入口"}, r"多出 \['zone_name'\]"),
 ])
-def test_06_parse_confidence_rejects(d06, value, message):
+def test_06_build_table_rejects_schema_drift(d06, first200, breakage, message):
+    bad = list(first200)
+    bad[5] = breakage(bad[5])
+    with pytest.raises(ValueError, match="第 5 筆欄位不符 schema"):
+        d06["build_table"](bad)
     with pytest.raises(ValueError, match=message):
-        d06["parse_confidence"](pd.Series(["50%", "N/A", value]))
+        d06["build_table"](bad)
 
 
-def test_06_dropna_halves_scaffold_zone(d06, raw):
-    conf = d06["parse_confidence"](raw["信心度"])
-    kept = raw[conf.notna()]
-    assert (raw["區域"] == "施工架").sum() == 115 and (kept["區域"] == "施工架").sum() == 52
-    viol = lambda d: ((d["區域"] == "施工架") & (d["事件"] != "防護具正確")).sum()  # noqa: E731
-    assert viol(raw) == 21 and viol(kept) == 14
+def test_06_single_row_frames_guess_type_per_row(d06, first200):
+    kinds = [str(pd.DataFrame([r])["confidence"].dtype) for r in first200]
+    assert kinds.count("object") == 15 and kinds.count("float64") == 185
 
 
-def test_06_workshop_observations(raw):
-    assert raw["事件編號"].is_unique
-    assert raw["發生時間"].is_monotonic_increasing
-    assert raw["發生時間"].min() == "2026/08/31 07:04" and raw["發生時間"].max() == "2026/09/05 16:59"
-    day = raw["發生時間"].str[:10].value_counts()
-    assert len(day) == 6 and day.min() == 107 and day.max() == 126
-    assert raw.groupby("區域")["攝影機"].nunique().eq(2).all()
-    assert raw["事件"].value_counts().to_dict() == {
-        "防護具正確": 575, "未戴安全帽": 61, "高處未使用安全帶": 33, "跨越警示線": 23}
-    assert raw["人員"].str.fullmatch(r"W\d{3}|未辨識").all()
-    assert raw.loc[raw["人員"] != "未辨識", "人員"].nunique() == 52
-    v = raw[raw["事件"] != "防護具正確"]
-    assert v["人員"].value_counts().index[0] == "未辨識" and (v["人員"] == "未辨識").sum() == 22
-    assert v.loc[v["人員"] != "未辨識", "人員"].value_counts().head(1).to_dict() == {"W018": 10}
+def test_06_groupby_result_has_no_columns(d06, first200):
+    by = d06["build_table"](first200).groupby(["zone", "event_type"]).size()
+    with pytest.raises(KeyError):
+        by["event_type"]
+    assert by.reset_index().columns.tolist() == ["zone", "event_type", 0]
+    assert by.reset_index(name="次數").columns.tolist() == ["zone", "event_type", "次數"]
 
 
-def test_06_ai_versions(d06, raw):
-    naive = pd.read_csv(d06["EXPORT"])
-    with pytest.raises(ValueError, match="'70%'"):
-        naive["信心度"].astype(float)
-    pct = naive["信心度"].str.replace("%", "").astype(float)
-    assert pct.isna().sum() == 63 and round(pct.mean(), 2) == 77.4 and round(pct.fillna(0).mean(), 2) == 70.35
-    assert len(naive.dropna()) == 629
-    with pytest.raises(ValueError, match="'N/A'"):
-        raw["信心度"].str.replace("%", "").astype(float)
+def test_06_event_id_duplicates(d06):
+    full = d06["build_table"](d06["load_records"](d06["EVENTS"]))
+    assert len(full) == 2838 and full["event_id"].nunique() == 2818
+    with pytest.raises(ValueError, match="event_id 重複：20 個 id 共 40 列，例如 cam-05-20260910-0016"):
+        d06["index_by_event_id"](full)
+    ok = d06["index_by_event_id"](full.drop_duplicates("event_id"))
+    assert ok.index.is_unique and len(ok) == 2818
 
 
-def test_06_default_na_probe():
-    probe = pd.read_csv(io.StringIO("v\nN/A\nNA\nn/a\nnull\nNULL\nNone\nnan\n-\n未辨識\n無\n"))
-    assert probe["v"].isna().tolist() == [True] * 7 + [False] * 3
+def test_06_dataframe_append_is_gone():
+    with pytest.raises(AttributeError, match="append"):
+        pd.DataFrame().append({"a": 1})
+
+
+@pytest.mark.filterwarnings("ignore::FutureWarning")
+def test_06_workshop_claims(d06):
+    recs = d06["load_records"](d06["EVENTS"], 500)
+    df = d06["build_table"](recs)
+    frames = [pd.DataFrame([r]) for r in recs]
+    assert sum(f["event_type"].iloc[0] == "no_helmet" for f in frames) == 44
+    assert (df["event_type"] == "no_helmet").sum() == 44
+    v = df[df["event_type"] != "ppe_ok"]
+    per_zone = v.groupby("zone").size().reset_index(name="次數")
+    assert per_zone.columns.tolist() == ["zone", "次數"]
+    assert dict(zip(per_zone["zone"], per_zone["次數"])) == {"Z1": 18, "Z2": 22, "Z3": 30, "Z4": 14}
+    by_worker = v.groupby("worker_id").size()
+    assert by_worker.idxmax() == "" and by_worker.max() == 14
+    named = by_worker.drop("").sort_values(ascending=False)
+    assert named.head(3).to_dict() == {"W018": 7, "W029": 7, "W020": 4}
+    assert df["event_time"].iloc[0] == "2026-08-31T07:04:37+08:00"
+    assert df["event_time"].iloc[-1] == "2026-09-04T10:17:06+08:00"
+    looped, _, _ = d06["concat_in_loop"](recs)
+    assert (looped["event_type"] == "no_helmet").sum() == 44 and not looped.index.is_unique

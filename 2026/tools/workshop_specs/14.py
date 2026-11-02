@@ -1,0 +1,7 @@
+LESSON = '14-derived-rules.md'
+TITLE = '改規則，交出差異'
+STARTER = '14_workshop_risk_v2.py'
+CLASS = '安全主管要求收緊：「2 次以上為中、4 次以上為高」。起手式已建好 risk-v2 並印出與 v1 的交叉表。執行它，回答：有幾列的等級變了？「無資料」有沒有變？應不應該變？'
+EXTENSION = '\n\n1. 用 `describe_rule()` 輸出 risk-v2 的規則說明，五個問題（版本、單位、邊界、無資料、依據）都要回答，並寫明門檻沒有法規依據。\n2. 請 OpenCode 寫「依每週違規次數產生 risk_level：3 次以上中、5 次以上高」，拿它的程式跑本節的 240 列：剛好 3 次、5 次的人是哪一級？W053 是哪一級？有沒有規則說明？'
+ACCEPT = '- 等級改變 67 列；「無資料」32 列不變，並說得出為什麼不該變。\n- （延伸）risk-v2 規則說明完整；AI 版本三件事都檢查過。'
+STARTER_CODE = '"""第 14 節 Workshop 課堂題：發布 risk-v2（2 次以上為中、4 次以上為高），比較與 v1 的差異。"""\n\nfrom importlib import import_module\n\nimport pandas as pd\n\ndemo = import_module("14_derived_rules")   # 檔名以數字開頭，改用 import_module 匯入\n\nif __name__ == "__main__":\n    table, types, period = demo.weekly_counts()\n    table["v1"] = demo.risk_level(table["violations"])\n    v2 = dict(demo.RULE, version="risk-v2", levels=[("低", 0, 2), ("中", 2, 4), ("高", 4, None)])\n    table["v2"] = demo.risk_level(table["violations"], v2)\n    print(pd.crosstab(table["v1"], table["v2"]).to_string())\n    print(f"等級改變的列數：{int((table[\'v1\'] != table[\'v2\']).sum())}")\n'

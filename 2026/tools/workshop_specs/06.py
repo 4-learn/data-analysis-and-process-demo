@@ -1,0 +1,8 @@
+LESSON = '06-event-row.md'
+TITLE = '判斷寫法，然後一次計數'
+STARTER = '06_workshop_two_ways.py'
+CLASS = '執行起手式，比較兩種寫法：兩個答案一樣嗎？下一個需求是「每區各幾次違規」，哪一種改得動？一句話說明寫法 A **為什麼沒辦法 `groupby`**。'
+EXTENSION = '\n\n1. 用寫法 B 的 `df`（違規＝`event_type != "ppe_ok"`）算「每區違規次數」，結果兩欄：`zone`、`次數`。再找違規最多的 `worker_id`，看看第一名是誰。\n2. 請 OpenCode 寫「逐行讀 `events.jsonl`，每筆累積到 DataFrame，最後統計每種事件幾次」，逐項檢查：\n\n| 檢查 | 怎麼確認 |\n| --- | --- |\n| 跑得起來嗎？ | 有 `df.append` 就會 `AttributeError` |\n| 計數對嗎？ | 與 `build_table()` 版比較 |\n| index 唯一嗎？ | `df.index.is_unique` |\n| `confidence` 是數字嗎？ | `df["confidence"].dtype` |\n| 有沒有在迴圈裡 `concat`？ | 讀程式 |'
+EXT_ANSWER = '每區違規數 Z1 18、Z2 22、Z3 30、Z4 14；違規最多的「人」是空字串 `""`（辨識不到臉），不是一個人。'
+ACCEPT = '- 兩種寫法答案都是 44，並用一句話說出寫法 A 為什麼之後沒辦法 `groupby`。\n- （延伸）每區違規數的欄名是 `zone`、`次數`（不是 `0`），並指出 `worker_id == ""` 不是一個人。\n- （延伸）AI 驗收表五列都有結論。'
+STARTER_CODE = '"""第 06 節 Workshop 課堂題：兩種寫法都算「前 500 筆 no_helmet 幾次」，比較結果與能不能 groupby。"""\n\nfrom importlib import import_module\n\nimport pandas as pd\n\ndemo = import_module("06_event_row")       # 檔名以數字開頭，改用 import_module 匯入\n\nif __name__ == "__main__":\n    records = demo.load_records(demo.EVENTS, 500)\n\n    # 寫法 A：一個事件一個 DataFrame\n    frames = [pd.DataFrame([r]) for r in records]\n    n_a = sum(f["event_type"].iloc[0] == "no_helmet" for f in frames)\n\n    # 寫法 B：一次建一張表\n    df = demo.build_table(records)\n    n_b = (df["event_type"] == "no_helmet").sum()\n\n    print(f"寫法 A：{n_a}；寫法 B：{n_b}")\n    print(f"寫法 A 有 {len(frames)} 張表；寫法 B 是一張 {df.shape} 的表")\n'

@@ -1,0 +1,8 @@
+LESSON = '03-read-files.md'
+TITLE = '第四份檔，以及抓 AI 的錯'
+STARTER = '03_workshop_fourth_file.py'
+CLASS = '執行起手式，在 `data/03-exports/` 放進第四份檔 `extra.csv`；然後\n\n1. 先預測：重新執行 `03_read_files.py` 會發生什麼？\n2. 執行，對照你的預測，指出擋下它的是哪一行程式。\n3. **刪除** `data/03-exports/extra.csv`（`rm data/03-exports/extra.csv`），否則之後每次執行都會停在同一個錯誤。'
+CLASS_ANSWER = '重新執行 `03_read_files.py`：停在 `ValueError: (pcode, slug) 重複 3 筆`，擋下它的是 `read_folder()` 最後的重複檢查。'
+EXTENSION = '把下列需求丟給 OpenCode，取得它的程式碼，用本節的檢查驗收：\n\n> 「讀 `data/03-exports/` 底下所有 CSV，合併成一個 DataFrame，找出 `slug` 是 1 的條文。」\n\n| 檢查 | 怎麼確認 | 正確答案 | AI 的版本通過嗎 |\n| --- | --- | --- | --- |\n| 三份都讀得進來？ | 列數 | 186 | |\n| `slug` 只有一種型別？ | `df["slug"].map(type).value_counts()` | 只有 `str` | |\n| 「slug 是 1」找到幾條？ | 篩選結果的列數 | 3（每部法規各 1 條） | |\n| 日期是否合理？ | 最早、最晚的 `modified_date` | 2015-07-01 到 2024-07-31 | |\n| 重複放檔會被擋嗎？ | 放回 `extra.csv` 再跑一次 | 會報錯 | |'
+ACCEPT = '- 預測與實際結果都寫下來，指得出擋下它的那一行。\n- `extra.csv` 已刪除，`03_read_files.py` 恢復正常。\n- （延伸）AI 驗收表五列都有結論。'
+STARTER_CODE = '"""第 03 節 Workshop 課堂題：在 data/03-exports/ 放入第四份檔 extra.csv。\n執行完，再跑一次 03_read_files.py，看會發生什麼。做完記得刪掉 extra.csv。"""\n\nfrom pathlib import Path\n\nimport pandas as pd\n\nEXPORTS = Path(__file__).resolve().parent / "data" / "03-exports"\n\nif __name__ == "__main__":\n    src = pd.read_csv(EXPORTS / "mass-layoff.csv", dtype=str, keep_default_na=False)\n    extra = src.head(3)\n    extra.to_csv(EXPORTS / "extra.csv", index=False)\n    print(f"放入 data/03-exports/extra.csv：{len(extra)} 列（大量解僱法前三條）")\n'

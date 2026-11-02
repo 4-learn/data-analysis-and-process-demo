@@ -1,0 +1,7 @@
+LESSON = '04-read-jsonl.md'
+TITLE = '全量 749 條'
+STARTER = '04_workshop_all_laws.py'
+CLASS = '執行起手式，用本節的 `read_jsonl()` 讀全量 `data/articles.jsonl`，看每部法規幾條；回答：**用一行 `pd.read_json(..., lines=True)` 讀全量，`slug` 是什麼型別？為什麼跟第一段的 21 條不同？**'
+EXTENSION = '寫一個檢查：每一列的 `source_url` 結尾必須是 `/{pcode}/articles/{slug}.html`。至少用兩種方式弄壞資料，證明你的檢查會擋下來（例如把某一列的 `slug` 改掉、把 `source_url` 改成空字串）。'
+ACCEPT = '- 起手式輸出 749 條、9 部法規。\n- 能說出全量時 `slug` 為什麼是字串、為什麼這反而危險。\n- （延伸）回溯檢查在 749 列全部通過，且兩種弄壞的方式都會失敗。'
+STARTER_CODE = '"""第 04 節 Workshop 課堂題：用本節的 read_jsonl() 讀全量 749 條，算每部法規幾條。"""\n\nfrom importlib import import_module\n\ndemo = import_module("04_read_jsonl")      # 檔名以數字開頭，不能寫 import 04_read_jsonl，改用 import_module\n\nif __name__ == "__main__":\n    df = demo.read_jsonl(demo.DATA / "articles.jsonl")\n    print(f"全部 {len(df)} 條；slug 的型別：{df[\'slug\'].dtype}")\n    print(df.groupby("law_name", sort=False).size().to_string())\n'

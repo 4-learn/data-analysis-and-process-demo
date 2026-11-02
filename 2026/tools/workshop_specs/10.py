@@ -1,0 +1,8 @@
+LESSON = '10-validate-idempotent.md'
+TITLE = '寫成 pytest，並弄壞它'
+STARTER = 'test_10_workshop.py'
+CLASS = '起手式已寫好一個測試、留了兩個 TODO。用 `python3 -m pytest -q test_10_workshop.py` 執行，看到 `1 passed, 2 skipped`；然後補完兩個 TODO（刪掉 `pytest.skip` 那一行），讓三個都通過。'
+CLASS_ANSWER = '補完兩個 TODO 後：`3 passed`。'
+EXTENSION = '\n\n1. 為下列每一種壞資料寫一個測試，證明 `validate()` 會擋下。**至少一種會擋不下來**——找出漏洞，說明後果：\n   1. `slug` 寫成 `"1.0"`\n   2. `source_version` 寫成 `"V2"`\n   3. `article_no` 寫成 `"第 24 條"`，但 `slug` 是 `"38"`\n   4. 一條 v2 修改的 `fetched_at` 早於 v1（`2026-01-01T00:00:00+00:00`）\n   5. `content` 改成 `"（刪除）"`，同時重算 `content_hash`\n2. 請 OpenCode 寫「把每天的增量 JSONL 合併到主表，重跑不能產生重複」，跑：同一批兩次、v2 後再送 v1。指紋一樣嗎？'
+ACCEPT = '- `test_10_workshop.py` 三個測試全部通過。\n- （延伸）五種壞資料都有測試，且正確判斷哪些該擋、哪些不該擋（4 和 5 擋不下來）。\n- （延伸）AI 版本兩種重跑情境都試過，有結論。'
+STARTER_CODE = '"""第 10 節 Workshop：把本節的驗證寫成 pytest。執行：python3 -m pytest -q test_10_workshop.py\n第一個測試已寫好；把兩個 TODO 補完（刪掉 pytest.skip 那一行）。"""\n\nfrom importlib import import_module\n\nimport pytest\n\ndemo = import_module("10_validate_idempotent")   # 檔名以數字開頭，改用 import_module 匯入\n\n\ndef test_v1_is_valid():\n    demo.validate(demo.read_batch(demo.DATA / "articles.jsonl"))\n\n\ndef test_apply_twice_same_fingerprint():\n    pytest.skip("TODO：套用 v2 兩次，比較兩次的 fingerprint() 要相同")\n\n\ndef test_missing_timezone_is_rejected():\n    pytest.skip("TODO：把 v2 某一列的 fetched_at 拿掉時區，用 pytest.raises(demo.ValidationError) 證明會被擋")\n'

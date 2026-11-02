@@ -16,7 +16,7 @@ THRESHOLD = 3              # 第 3 筆「高處未使用安全帶」就告警
 
 
 def estimate_tokens(text):
-    """保守粗估（同第 16 節）：非 ASCII 字元與數字各算 1、其他 ASCII 算 0.5，再乘 1.2。"""
+    """保守粗估（同第 17 節）：非 ASCII 字元與數字各算 1、其他 ASCII 算 0.5，再乘 1.2。"""
     heavy = sum(1 for ch in text if not ch.isascii() or ch.isdigit())
     light = len(text) - heavy
     return math.ceil((heavy + light * 0.5) * 1.2)
@@ -45,7 +45,7 @@ def stream_alerts(lines, window=WINDOW_SECONDS, threshold=THRESHOLD):
 
 
 def read_events(path=EVENTS):
-    """先讀成字串，不讓 pandas 猜（第 02、03 節的立場）。"""
+    """先讀成字串，不讓 pandas 猜（第 03、04 節的立場）。"""
     return pd.read_json(path, lines=True, dtype=False, convert_dates=False)
 
 

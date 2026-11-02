@@ -1,0 +1,8 @@
+LESSON = '15-merge-fanout.md'
+TITLE = '每個承攬商的違規率'
+STARTER = '15_workshop_contractor.py'
+CLASS = '**先預測**：只用 `worker_id` 做 `inner` 合併，甲營造、乙鋼構、丙土木各會有幾列？（提示：W023 的 52 筆會同時出現在乙鋼構與丙土木。）寫下預測後，執行起手式（它用的是依有效期間合併的 `attach_roster()`），在 `agg(...)` 加上違規數與違規率。'
+CLASS_ANSWER = '加上兩欄後：甲營造 817／105（0.129）、乙鋼構 846／201（0.238）、丙土木 791／113（0.143），違規加總 419。'
+EXTENSION = '\n\n1. 用天真的 `inner` 合併再算一次，兩張表差在哪幾格？交一張「合併前後列數」表：預測、實際、差異、原因。\n2. 請 OpenCode 寫「把事件表和名冊合併，算每個承攬商的違規率」，檢查：它用哪個 `how`？有沒有 `validate`？W023 被算到哪裡？事件數加總是 2454 嗎？'
+ACCEPT = '- 預測寫在執行之前；事件數加總 2454、違規加總 419。\n- （延伸）合併前後列數表；AI 版本至少指出兩個錯。'
+STARTER_CODE = '"""第 15 節 Workshop 課堂題：每個承攬商的違規率。已經算好事件數；請加上違規數與違規率。"""\n\nfrom importlib import import_module\n\ndemo = import_module("15_merge_fanout")   # 檔名以數字開頭，改用 import_module 匯入\n\nif __name__ == "__main__":\n    ev = demo.read_events()\n    ev["violation"] = ev["event_type"].isin(demo.VIOLATIONS)\n    staff = demo.attach_roster(ev, demo.read_csv("workers.csv"))\n    known = staff[staff["worker_id"] != ""]\n    table = known.groupby("contractor").agg(事件數=("event_id", "size"))   # TODO：加上 違規數、違規率\n    print(table.to_string())\n    print(f"事件數合計 {table[\'事件數\'].sum()}（應等於已辨識事件數 {len(known)}）")\n'

@@ -14,7 +14,7 @@ def test_01_output_matches_lesson():
         for old, new in PANDAS2_DIFFS:
             out = out.replace(old, new)
     blocks = [b for b in pasted_blocks(LESSON) if b.startswith("== ")]
-    assert len(blocks) == 3
+    assert len(blocks) == 4   # 2026-10-21 改成每段一張圖：輸出 1–4 段各自貼在對應段落
     for b in blocks:
         assert b in out, b[:300]
 
@@ -35,10 +35,10 @@ def types(d01):
 
 
 def test_01_estimator_is_the_same_rule_as_lesson_16(d01):
-    d16 = load_demo("16-context-budget.md")[2]
+    d17 = load_demo("17-context-budget.md")[2]
     samples = ["", "a", "安全帽", "W041 no_harness 2026-09-22", '{"zone":"Z4"}\n', "第 19 條，高度二公尺以上"]
     for s in samples:
-        assert d01["estimate_tokens"](s) == d16["estimate_tokens"](s), s
+        assert d01["estimate_tokens"](s) == d17["estimate_tokens"](s), s
     assert d01["estimate_tokens"]("ab") == 2            # 0.5*2*1.2=1.2 → 無條件進位 2
     assert d01["estimate_tokens"]("安1") == 3           # 2*1.2=2.4 → 3
 

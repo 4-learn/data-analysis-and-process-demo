@@ -1,0 +1,8 @@
+LESSON = '08-select-filter.md'
+TITLE = '子集計數、前三名，然後抓 AI 的錯'
+STARTER = '08_workshop_subset.py'
+CLASS = '執行起手式：出入口（Z1）在 2026-09-15～09-17 有幾筆未戴安全帽？信心度高於 0.8 的有幾筆？然後回答：信心度 > 0.8 的那幾筆裡，有幾筆其實是 cam-02 的百分比 bug（第 09 節）？修正後是幾筆？'
+CLASS_ANSWER = '信心度 > 0.8 的 10 筆中，7 筆是 cam-02 的百分比值（43～98）；改回小數後是 6 筆。'
+EXTENSION = '\n\n1. 「跨越警示線（`restricted_entry`）次數最多的前三名工人是誰？」用原始 `df` 與 `drop_duplicates("event_id")` 後各算一次，兩次都用至少兩種 Top-K 寫法，排除空字串。第三名如果有並列，報告要怎麼寫？\n2. 請 OpenCode「把 cam-02 信心度大於 1 的值除以 100，然後列出跨越警示線前三名」，驗收：有沒有 chained assignment（跑完 `(df["confidence"] > 1).sum()` 應為 0）？複合條件有沒有括號？前三名有沒有排除空字串、處理並列？'
+ACCEPT = '- 子集計數 16 與 10，並說明修正後為什麼是 6。\n- （延伸）程式中**沒有** chained assignment；前三名至少兩種寫法，並列有明確寫出。\n- （延伸）AI 驗收都有結論。'
+STARTER_CODE = '"""第 08 節 Workshop 課堂題：出入口（Z1）2026-09-15～09-17 有幾筆未戴安全帽？信心度高於 0.8 的有幾筆？"""\n\nfrom importlib import import_module\n\ndemo = import_module("08_select_filter")   # 檔名以數字開頭，改用 import_module 匯入\n\nif __name__ == "__main__":\n    df = demo.load_events()\n    hit = demo.subset(df, "Z1", "2026-09-15T00:00:00+08:00", "2026-09-18T00:00:00+08:00", "no_helmet")\n    c = hit["confidence"]\n    print(f"Z1 09-15～09-17 no_helmet：{len(hit)} 筆；信心度 > 0.8：{int((c > 0.8).sum())} 筆")\n    print(hit["camera_id"].value_counts().to_string())\n'

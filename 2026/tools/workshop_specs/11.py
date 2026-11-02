@@ -1,0 +1,8 @@
+LESSON = '11-event-vs-ingest.md'
+TITLE = '兩種每日計數，哪個合理？'
+STARTER = '11_workshop_two_daily.py'
+CLASS = '執行起手式，看依發生日、依到達日的每日計數差在哪幾天。寫一句話：主管要「每天的違規次數」，你交哪一份？如果日報每天 23:59 自動產出，09-10 那份會是幾筆？'
+CLASS_ANSWER = '交依發生日的那份，但要寫明「截至何時」；23:59 自動產出時 09-10 是 97 筆，差的 20 筆隔天 09:05 才到。'
+EXTENSION = '\n\n1. 改成只數違規事件，列出造成差異的那 20 列（`event_id`、發生時間、到達時間）。\n2. 請 OpenCode「用 `events.jsonl` 算每天的事件數」，驗收：它用 `event_time` 還是 `ingested_at`？有沒有依 `event_id` 去重？若用 `ingested_at`：日期是 UTC 還是台北？結果裡有沒有週日？'
+ACCEPT = '- 說得出 09-10 依發生日、依到達日各幾筆，主管該看哪一個、報表要加什麼說明。\n- （延伸）交出造成差異的 20 列清單；AI 版本三個問題都有答案。'
+STARTER_CODE = '"""第 11 節 Workshop 課堂題：依發生日、依到達日（台北）各數一次每日事件，並排看差在哪幾天。"""\n\nfrom importlib import import_module\n\nimport pandas as pd\n\ndemo = import_module("11_event_vs_ingest")   # 檔名以數字開頭，改用 import_module 匯入\n\nif __name__ == "__main__":\n    events = demo.dedupe(demo.load_events())\n    table = pd.DataFrame({"依發生日": demo.daily(events, "event"), "依到達日": demo.daily(events, "ingest")})\n    table["差"] = table["依到達日"] - table["依發生日"]\n    print(f"{len(events)} 列，{len(table)} 天")\n    print(table[table["差"] != 0].to_string())\n'

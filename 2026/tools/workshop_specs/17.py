@@ -1,0 +1,7 @@
+LESSON = '17-context-budget.md'
+TITLE = '誰被丟掉了？'
+STARTER = '17_workshop_dropped.py'
+CLASS = '第三段「丟掉 12 條」裡，第一個被丟掉的是**職業安全衛生法第 6 條**。執行起手式印出它的內容。「營造安全衛生設施標準」第 1 條寫著「本標準依職業安全衛生法**第六條第三項**規定訂定之」——被送出的 4 條細則，母法依據正是被丟掉的這一條。判斷：對「墜落」這個問題，丟掉它合理嗎？'
+EXTENSION = '\n\n1. 換一種排序，各跑一次 `fit_budget()`，比較送出哪幾條：**短的優先**（新增 `hits["length"] = hits["content"].str.len()`，以 `-length` 排序）、**母法優先**（新增欄位，職業安全衛生法為 1、其他為 0）。\n2. 請 OpenCode 寫「把 DataFrame 轉成給 LLM 的 JSON，控制在 3,000 token 內」，檢查：`force_ascii=False`？丟掉的列有沒有紀錄？是不是用 `content.str[:200]` 截斷？'
+ACCEPT = '- 說得出：丟掉第 6 條不合理，但錯的是**排序規則**，不是 `fit_budget()`。\n- （延伸）兩種排序各一列：送出幾條、職安法第 6 條是否送出、估計 token；AI 版本三項檢查都有結論。'
+STARTER_CODE = '"""第 17 節 Workshop 課堂題：第一個被丟掉的條文（職業安全衛生法第 6 條）寫了什麼？"""\n\nfrom pathlib import Path\n\nimport pandas as pd\n\nDATA = Path(__file__).resolve().parent / "data"\n\nif __name__ == "__main__":\n    df = pd.read_json(DATA / "articles.jsonl", lines=True, dtype=False, convert_dates=False)\n    print(df.query("pcode == \'N0060001\' and slug == \'6\'")["content"].iloc[0])\n'

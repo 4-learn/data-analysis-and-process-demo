@@ -1,0 +1,1116 @@
+# 19｜從 JSONL 到 LLM 可讀摘要
+
+> 從 events.jsonl 到給 LLM 的摘要：一支可重跑、會擋壞資料的程式。
+
+<!-- 格式：每段一張圖 -->
+[回 19 節課綱](../../course-plans/2026-10-data-analysis-18.md)
+
+## 範例程式碼
+
+| 檔案 | 講解段落 | 內容 | 執行指令 |
+| --- | --- | --- | --- |
+| [`19_end_to_end.py`](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/19_end_to_end.py) | 零～六 | 讀取 → 清理 → 驗證 → 彙總 → 濃縮 → 序列化，重跑與擋壞資料 | `python3 19_end_to_end.py` |
+
+- 在 [`2026/`](https://github.com/4-learn/data-analysis-and-process-demo/tree/master/2026) 資料夾執行；練習資料與環境說明見該資料夾的 README。
+- 只讀 `data/`，不寫檔、不連網。
+
+## 學完能做到
+
+| 時間 | 段落 | 學完能做到 |
+| --- | --- | --- |
+| 0–8 分 | 零、一 | 說出 AI 一行版為什麼壞資料照樣產出摘要 |
+| 8–30 分 | 二～四 | 走一遍管線：讀取 → 清理 → 驗證 → 彙總 → 濃縮 → 序列化 |
+| 30–38 分 | 五、六 | 用指紋證明可重跑；故意餵壞資料，全部擋下 |
+| 38–50 分 | Workshop | 加兩道檢查 |
+
+## 本節流程
+
+```mermaid
+flowchart TD
+    J[("events.jsonl")] --> R["1 read_events()<br/>03、04 節"]
+    R --> C["2 clean()＋audit<br/>09、10 節"]
+    C --> V["3 validate()<br/>10～12 節"]
+    V --> W["4 weekly()<br/>12、13 節"]
+    W --> S["5 condense()<br/>14、16 節"]
+    S --> O["6 serialize()＋預算<br/>17 節"]
+    O --> F(["摘要 JSONL"])
+    R -.-> X(["PipelineError：整批擋下"])
+    V -.-> X
+    S -.-> X
+    O -.-> X
+    style X fill:#fde2e1,stroke:#c0392b
+    style F fill:#ddf3e4,stroke:#27ae60,stroke-width:3px
+```
+
+每段都是：**問題 → 位置（黃色）→ 步驟圖 → 程式 → 輸出 → 重點**。
+
+## 零、準備：規格、例外、讀取
+
+**問題：** 管線的第一步要擋下什麼？
+
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：—"] --> C["零、讀取"] --> N["接下來：一、二、三、四、五、六"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["read_json(dtype=False, convert_dates=False)"] --> B{"必要欄位都在？"}
+    B -- 否 --> X(["PipelineError"])
+    B -- 是 --> C{"有缺鍵（NaN）？<br/>confidence 除外"}
+    C -- 有 --> X
+    C -- 沒有 --> D{"confidence 是數字？<br/>其他欄是字串？"}
+    D -- 否 --> X
+    D -- 是 --> E(["raw"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class X bad
+    class E good
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 02 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 02 節）、[`Path(__file__).resolve().parent`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.resolve)（第 02 節）、[`df.columns`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.columns.html#pandas.DataFrame.columns)（第 02 節）、[`df.index`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.index.html#pandas.DataFrame.index)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`pd.read_csv()`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html#pandas.read_csv)（第 02 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 03 節）、[`.isna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isna.html#pandas.Series.isna)（第 04 節）、[`pd.read_json()`](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json)（第 04 節）、[`s.map()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.map.html#pandas.Series.map)（第 04 節）、[`.astype()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.astype.html#pandas.Series.astype)（第 07 節）、[`.dropna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dropna.html#pandas.Series.dropna)（第 07 節）、[`s.isin()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isin.html#pandas.Series.isin)（第 08 節）、[`s.eq()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.eq.html#pandas.Series.eq)（第 13 節）、[`ch.isascii()`](https://docs.python.org/3.12/library/stdtypes.html#str.isascii)（第 16 節）、[`ch.isdigit()`](https://docs.python.org/3.12/library/stdtypes.html#str.isdigit)（第 16 節）、[`math.ceil()`](https://docs.python.org/3.12/library/math.html#math.ceil)（第 16 節）、[`Path()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path)（爬蟲 10） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+import hashlib
+import io
+import json
+import math
+from pathlib import Path
+
+import pandas as pd
+
+DATA = Path(__file__).resolve().parent / "data" / "events"
+REQUIRED = ["event_id", "zone", "camera_id", "worker_id", "event_type", "confidence", "event_time", "ingested_at"]
+NULLABLE = {"confidence"}          # cam-08 舊模型沒記錄；其他必要欄位一律不准是空值
+TOP_K = 3
+BURST = 5           # 同一人同一天違規達 5 筆列為異常（看過分布才定的，見第 16 節）
+BUDGET = 1500       # 摘要的估計 token 上限（LLM 組給的數字）
+
+
+class PipelineError(ValueError):
+    """資料不符合規格或超出預算：整批擋下，不產出任何摘要。"""
+
+
+def estimate_tokens(text):
+    """第 17 節的保守粗估：非 ASCII 字元與數字各算 1、其他 ASCII 算 0.5，再乘 1.2。"""
+    heavy = sum(1 for ch in text if not ch.isascii() or ch.isdigit())
+    return math.ceil((heavy + (len(text) - heavy) * 0.5) * 1.2)
+
+
+# ---------------------------------------------------------------- 1. 讀取
+
+def read_events(source):
+    """不讓 pandas 猜型別、不看欄名轉日期（第 03、04 節），讀完立刻檢查欄位與型別。"""
+    raw = pd.read_json(source, lines=True, dtype=False, convert_dates=False)
+    missing = [c for c in REQUIRED if c not in raw.columns]
+    if missing:
+        raise PipelineError(f"缺少欄位 {missing}")
+    for col in REQUIRED:
+        if col not in NULLABLE and raw[col].isna().any():     # JSONL 某一行少了這個鍵 → 那一格是 NaN
+            raise PipelineError(f"{col} 有空值（某一行少了這個鍵）：第 {raw.index[raw[col].isna()][0] + 1} 行")
+    conf = raw["confidence"].dropna()
+    not_num = ~conf.map(type).isin([int, float])      # 整欄都是 null 時 pandas 3 讀成 object，所以逐格看
+    if not_num.any():
+        raise PipelineError(f"confidence 不是數字：第 {not_num.index[not_num][0] + 1} 行 {conf[not_num].iloc[0]!r}")
+    raw["confidence"] = raw["confidence"].astype(float)
+    for col in set(REQUIRED) - NULLABLE:
+        not_str = ~raw[col].map(type).eq(str)
+        if not_str.any():
+            raise PipelineError(f"{col} 不是字串：第 {raw.index[not_str][0] + 1} 行 {raw.loc[not_str, col].iloc[0]!r}")
+    return raw
+
+
+def read_event_types():
+    types = pd.read_csv(DATA / "event-types.csv", dtype=str, keep_default_na=False)
+    return set(types["event_type"]), set(types.loc[types["is_violation"] == "true", "event_type"])
+```
+
+- 每一步都是前面某一節的東西；**這節把它們串起來**。
+- 資料有問題就整批不給：`PipelineError` 繼承 `ValueError`。
+
+| 步驟 | 函式 | 失敗時 | 出處 |
+| --- | --- | --- | --- |
+| 1. 讀取 | `read_events()` | 拋例外 | 02、03 |
+| 2. 清理 | `clean()` | 記進 audit | 08、09 |
+| 3. 驗證 | `validate()` | 拋例外 | 09～11 |
+| 4. 彙總 | `weekly()` | — | 11、12 |
+| 5. 濃縮 | `condense()` | 追不回就拋例外 | 13、15 |
+| 6. 序列化 | `serialize()` | 超過預算就拋例外 | 16 |
+
+## 一、AI 的一行版：壞資料照樣產出摘要
+
+**問題：** 壞資料進去，AI 的一行版會發現嗎？
+
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：零"] --> C["一、AI 一行版"] --> N["接下來：二、三、四、五、六"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["原始檔"] --> R["read_json() 一行<br/>groupby().nlargest()"]
+    B["第 6 行少了時區"] --> R
+    C["第 6 行 event_type=no_vest"] --> R
+    R --> D(["三份都照樣產出摘要"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class D bad
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`d.items()`](https://docs.python.org/3.12/library/stdtypes.html#dict.items)（第 06 節）、[`io.StringIO()`](https://docs.python.org/3.12/library/io.html#io.StringIO)（第 07 節）、[`json.loads()`](https://docs.python.org/3.12/library/json.html#json.loads)（爬蟲 03）、[`json.dumps()`](https://docs.python.org/3.12/library/json.html#json.dumps)（爬蟲 05） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+def broken(lines, line_no, **changes):
+    """在記憶體中複製一份並弄壞第 line_no 行（不寫檔）。changes 的值為 None 代表刪掉該欄。"""
+    out = list(lines)
+    rec = json.loads(out[line_no])
+    for k, v in changes.items():
+        if v is None:
+            rec.pop(k, None)
+        else:
+            rec[k] = v
+    out[line_no] = json.dumps(rec, ensure_ascii=False)
+    return io.StringIO("\n".join(out) + "\n")
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`groupby().size()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.size.html#pandas.api.typing.DataFrameGroupBy.size)（第 02 節）、[`path.read_text()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.read_text)（第 04 節）、[`pd.read_json()`](https://pandas.pydata.org/docs/reference/api/pandas.read_json.html#pandas.read_json)（第 04 節）、[`.to_dict()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.to_dict.html#pandas.Series.to_dict)（第 06 節）、[`.nlargest()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nlargest.html#pandas.Series.nlargest)（第 08 節）、[`pd.api.types.is_datetime64_any_dtype()`](https://pandas.pydata.org/docs/reference/api/pandas.api.types.is_datetime64_any_dtype.html#pandas.api.types.is_datetime64_any_dtype)（第 12 節） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+path = DATA / "events.jsonl"
+lines = path.read_text(encoding="utf-8").splitlines()
+
+print("== 1. AI 的一行版：壞資料照樣產出摘要 ==")
+for label, src in [("原始檔", path),
+                   ("第 6 行少了時區", broken(lines, 5, event_time="2026-08-31T07:30:00")),
+                   ("第 6 行 event_type='no_vest'", broken(lines, 5, event_type="no_vest"))]:
+    df = pd.read_json(src, lines=True)
+    top = df[df["event_type"] != "ppe_ok"].groupby("worker_id").size().nlargest(2).to_dict()
+    kind = "日期" if pd.api.types.is_datetime64_any_dtype(df["event_time"]) else "文字"
+    print(f"{label:24} event_time 是{kind}  違規 {int((df['event_type'] != 'ppe_ok').sum())}  {top}")
+```
+
+<sub>📄 來源：執行 `python3 19_end_to_end.py` 的輸出（第 1 段）</sub>
+
+```text
+== 1. AI 的一行版：壞資料照樣產出摘要 ==
+原始檔                      event_time 是日期  違規 498  {'': 77, 'W041': 36}
+第 6 行少了時區                event_time 是文字  違規 498  {'': 77, 'W041': 36}
+第 6 行 event_type='no_vest' event_time 是日期  違規 499  {'': 78, 'W041': 36}
+```
+
+- `broken()`：在記憶體裡複製一份、弄壞某一行，不寫檔。
+- 少了時區：`event_time` 從「日期」變「文字」，沒有錯誤訊息。
+
+## 二、清理與 audit
+
+**問題：** 哪些可以自動修？修了怎麼交代？
+
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：零、一"] --> C["二、clean"] --> N["接下來：三、四、五、六"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["raw"] --> B["依到達時間排序"]
+    B --> C["除 ingested_at 外完全相同<br/>→ 重送，留最先到的"]
+    C --> D["confidence > 1 → ÷100"]
+    D --> E(["ev＋audit 紀錄"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class E good
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `s.argsort(kind="stable")` | 排序後每個位置原本是第幾個；`kind="stable"` 相同的值保留原順序 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.argsort.html#pandas.Series.argsort) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 02 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 02 節）、[`.reset_index()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reset_index.html#pandas.DataFrame.reset_index)（第 02 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`df.columns`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.columns.html#pandas.DataFrame.columns)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 03 節）、[`.duplicated()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.duplicated.html#pandas.DataFrame.duplicated)（第 03 節）、[`pd.to_datetime()`](https://pandas.pydata.org/docs/reference/api/pandas.to_datetime.html#pandas.to_datetime)（第 03 節）、[`s.unique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.unique.html#pandas.Series.unique)（第 06 節）、[`整欄運算`](https://pandas.pydata.org/docs/user_guide/basics.html#flexible-binary-operations)（第 07 節）、[`.copy()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.copy.html#pandas.DataFrame.copy)（第 08 節） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+# ---------------------------------------------------------------- 2. 清理
+
+def clean(raw):
+    """只去掉「重送」：除了 ingested_at 以外完全相同的列。修正 cam-02 的百分比。每一項都記進 audit。"""
+    audit = []
+    same = [c for c in raw.columns if c != "ingested_at"]
+    arrived = pd.to_datetime(raw["ingested_at"], utc=True, format="ISO8601")
+    raw = raw.iloc[arrived.argsort(kind="stable")]         # 依到達時間排，「留最先到達」才不看輸入順序
+    resend = raw.duplicated(subset=same, keep="first")
+    if resend.any():
+        audit.append({"step": "去重", "rule": "除 ingested_at 外完全相同，留最先到達的一筆",
+                      "rows": int(resend.sum()), "cameras": sorted(raw.loc[resend, "camera_id"].unique())})
+    ev = raw[~resend].copy()
+    pct = ev["confidence"] > 1
+    if pct.any():
+        ev.loc[pct, "confidence"] = ev.loc[pct, "confidence"] / 100
+        audit.append({"step": "修正", "rule": "confidence > 1 視為百分比，÷100",
+                      "rows": int(pct.sum()), "cameras": sorted(ev.loc[pct, "camera_id"].unique())})
+    ev["conf_fixed"] = pct
+    return ev.reset_index(drop=True), audit
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.is_unique`](https://pandas.pydata.org/docs/reference/api/pandas.Series.is_unique.html#pandas.Series.is_unique)（第 06 節） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+print("\n== 2. 清理與 audit ==")
+known, violation = read_event_types()
+raw = read_events(path)
+ev, audit = clean(raw)
+for a in audit:
+    print(a)
+print(f"{len(raw)} 列 → {len(ev)} 列；event_id 唯一：{ev['event_id'].is_unique}")
+```
+
+<sub>📄 來源：執行 `python3 19_end_to_end.py` 的輸出（第 2 段）</sub>
+
+```text
+== 2. 清理與 audit ==
+{'step': '去重', 'rule': '除 ingested_at 外完全相同，留最先到達的一筆', 'rows': 20, 'cameras': ['cam-05']}
+{'step': '修正', 'rule': 'confidence > 1 視為百分比，÷100', 'rows': 69, 'cameras': ['cam-02']}
+2838 列 → 2818 列；event_id 唯一：True
+```
+
+- 只去掉「完全相同的重送」；內容不同的同一 `event_id` 交給驗證擋下。
+- 先依到達時間排序：「留最先到的」才不看輸入順序。
+
+## 三、驗證通過，彙總成每人每週
+
+**問題：** 哪些情況要整批擋下？
+
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：零、一、二"] --> C["三、validate＋weekly"] --> N["接下來：四、五、六"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["validate()"] --> B{"event_id 唯一？<br/>時間帶時區？<br/>event_type 在白名單？<br/>confidence 在 0–1？"}
+    B -- 任一否 --> X(["PipelineError"])
+    B -- 全是 --> C["加上 date・week・late・is_violation"]
+    C --> D["weekly()<br/>未辨識記在 (未辨識) 名下"]
+    D --> E(["違規合計＝事件表違規數"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class X bad
+    class E good
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `s.between(a, b)` | 每個值是否 `a ≤ 值 ≤ b` | [文件](https://pandas.pydata.org/docs/reference/api/pandas.Series.between.html#pandas.Series.between) |
+| `.groupby(...)[欄].nunique()` | 每組有幾種不同的值 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.SeriesGroupBy.nunique.html#pandas.api.typing.SeriesGroupBy.nunique) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 02 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 02 節）、[`.reset_index()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.reset_index.html#pandas.DataFrame.reset_index)（第 02 節）、[`.sort_values()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.sort_values.html#pandas.DataFrame.sort_values)（第 02 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`groupby().size()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.size.html#pandas.api.typing.DataFrameGroupBy.size)（第 02 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 03 節）、[`.duplicated()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.duplicated.html#pandas.DataFrame.duplicated)（第 03 節）、[`pd.concat()`](https://pandas.pydata.org/docs/reference/api/pandas.concat.html#pandas.concat)（第 03 節）、[`pd.to_datetime()`](https://pandas.pydata.org/docs/reference/api/pandas.to_datetime.html#pandas.to_datetime)（第 03 節）、[`.rename()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.rename.html#pandas.Series.rename)（第 04 節）、[`s.str.contains()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.str.contains.html#pandas.Series.str.contains)（第 04 節）、[`.notna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.notna.html#pandas.Series.notna)（第 05 節）、[`df.assign()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.assign.html#pandas.DataFrame.assign)（第 05 節）、[`s.unique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.unique.html#pandas.Series.unique)（第 06 節）、[`.astype()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.astype.html#pandas.Series.astype)（第 07 節）、[`.fillna()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.fillna.html#pandas.Series.fillna)（第 07 節）、[`整欄運算`](https://pandas.pydata.org/docs/user_guide/basics.html#flexible-binary-operations)（第 07 節）、[`s.isin()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isin.html#pandas.Series.isin)（第 08 節）、[`.replace()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.replace.html#pandas.Series.replace)（第 09 節）、[`.strftime()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.strftime.html#pandas.Series.dt.strftime)（第 11 節）、[`groupby()[欄].max()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.SeriesGroupBy.max.html#pandas.api.typing.SeriesGroupBy.max)（第 11 節）、[`pd.Timedelta`](https://pandas.pydata.org/docs/reference/api/pandas.Timedelta.html#pandas.Timedelta)（第 11 節）、[`s.dt.tz_convert()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.tz_convert.html#pandas.Series.dt.tz_convert)（第 11 節）、[`pd.to_timedelta()`](https://pandas.pydata.org/docs/reference/api/pandas.to_timedelta.html#pandas.to_timedelta)（第 14 節）、[`s.dt.normalize()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.normalize.html#pandas.Series.dt.normalize)（第 16 節）、[`s.dt.weekday`](https://pandas.pydata.org/docs/reference/api/pandas.Series.dt.weekday.html#pandas.Series.dt.weekday)（第 16 節） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+# ---------------------------------------------------------------- 3. 驗證
+
+def validate(ev, known_types, violation_types):
+    """業務規則（清理之後）。全部通過才回傳加了 date／week／late／is_violation 的新表。"""
+    dup = ev["event_id"].duplicated(keep=False)
+    if dup.any():
+        raise PipelineError(f"業務鍵 event_id 不唯一（內容不同的同一事件）：{ev.loc[dup, 'event_id'].iloc[0]}")
+    for col in ("event_time", "ingested_at"):
+        no_tz = ~ev[col].str.contains(r"(?:[+-]\d\d:\d\d|Z)$")
+        if no_tz.any():
+            raise PipelineError(f"{col} 沒有時區：{ev.loc[no_tz, 'event_id'].iloc[0]} {ev.loc[no_tz, col].iloc[0]!r}")
+    unknown = ~ev["event_type"].isin(known_types)
+    if unknown.any():
+        raise PipelineError(f"未知 event_type {sorted(ev.loc[unknown, 'event_type'].unique())}，白名單 {sorted(known_types)}")
+    bad = ev["confidence"].notna() & ~ev["confidence"].between(0, 1)
+    if bad.any():
+        raise PipelineError(f"confidence 超出 0–1：{ev.loc[bad, 'event_id'].iloc[0]}")
+    t = pd.to_datetime(ev["event_time"], format="ISO8601", utc=True).dt.tz_convert("Asia/Taipei")
+    arrived = pd.to_datetime(ev["ingested_at"], format="ISO8601", utc=True)
+    return ev.assign(
+        date=t.dt.strftime("%Y-%m-%d"),
+        week=(t.dt.normalize() - pd.to_timedelta(t.dt.weekday, unit="D")).dt.strftime("%Y-%m-%d"),
+        late=(arrived - t) > pd.Timedelta(hours=1),
+        is_violation=ev["event_type"].isin(violation_types),
+    )
+
+
+# ---------------------------------------------------------------- 4. 彙總
+
+def weekly(ev):
+    """每人每週一列。辨識不到臉的事件記在 '(未辨識)' 名下，不丟掉。"""
+    v = ev.assign(who=ev["worker_id"].replace("", "(未辨識)"))
+    bad = v[v["is_violation"]]
+    keys = ["who", "week"]
+    table = pd.concat([
+        v.groupby(keys).size().rename("events"),
+        bad.groupby(keys).size().rename("violations"),
+        bad.groupby(keys)["date"].nunique().rename("violation_days"),
+        bad.groupby(keys + ["date"]).size().groupby(keys).max().rename("max_per_day"),
+    ], axis=1).fillna(0).astype(int).reset_index()
+    return table.sort_values(keys, ignore_index=True)
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`.nunique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html#pandas.Series.nunique)（第 02 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`df.to_string()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_string.html#pandas.DataFrame.to_string)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`pd.read_csv()`](https://pandas.pydata.org/docs/reference/api/pandas.read_csv.html#pandas.read_csv)（第 02 節）、[`s.isin()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isin.html#pandas.Series.isin)（第 08 節） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+print("\n== 3. 驗證通過，彙總成每人每週 ==")
+ev = validate(ev, known, violation)
+table = weekly(ev)
+roster = pd.read_csv(DATA / "workers.csv", dtype=str, keep_default_na=False)
+absent = sorted(set(roster["worker_id"]) - set(table["who"]))
+print(f"{len(table)} 列；違規合計 {table['violations'].sum()}，與事件表 {int(ev['is_violation'].sum())} 筆一致")
+print(f"名冊 {roster['worker_id'].nunique()} 人，表上 {table['who'].nunique() - 1} 人＋(未辨識)；不在表上：{absent[0]}–{absent[-1]} 共 {len(absent)} 人")
+print(table[table["who"].isin(["W041", "(未辨識)"])].to_string(index=False))
+```
+
+<sub>📄 來源：執行 `python3 19_end_to_end.py` 的輸出（第 3 段）</sub>
+
+```text
+== 3. 驗證通過，彙總成每人每週 ==
+212 列；違規合計 496，與事件表 496 筆一致
+名冊 60 人，表上 52 人＋(未辨識)；不在表上：W053–W060 共 8 人
+  who       week  events  violations  violation_days  max_per_day
+(未辨識) 2026-08-31      92          22               6            7
+(未辨識) 2026-09-07      92          17               6            6
+(未辨識) 2026-09-14      88          19               6            6
+(未辨識) 2026-09-21      92          19               6            6
+ W041 2026-08-31       6           2               2            1
+ W041 2026-09-07      12           4               3            2
+ W041 2026-09-14      17           6               4            2
+ W041 2026-09-21      32          24               5           18
+```
+
+- 彙總後核對：違規合計要等於事件表的違規數。
+- 名冊上沒有事件的人不在表上——這張表回答的是「誰違規」。
+
+## 四、濃縮、序列化、預算
+
+**問題：** 摘要長什麼樣？超過預算怎麼辦？
+
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：零、一、二、三"] --> C["四、condense＋serialize"] --> N["接下來：五、六"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["condense()"] --> B["Top 3・未辨識・趨勢<br/>異常・資料註記"]
+    B --> C{"每列的 key 查得到事件？"}
+    C -- 否 --> X(["PipelineError"])
+    C -- 是 --> D["serialize()<br/>JSONL，force_ascii=False"]
+    D --> E{"估計 token > 1500？"}
+    E -- 是 --> X
+    E -- 否 --> F(["摘要 JSONL"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class X bad
+    class F good
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `.groupby(...)[[欄1, 欄2]].sum()` | 每組各欄加總 | [文件](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.sum.html#pandas.api.typing.DataFrameGroupBy.sum) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 02 節）、[`.sort_values()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.sort_values.html#pandas.DataFrame.sort_values)（第 02 節）、[`.sum()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.sum.html#pandas.Series.sum)（第 02 節）、[`df.groupby()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.groupby.html#pandas.DataFrame.groupby)（第 02 節）、[`df.head()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.head.html#pandas.DataFrame.head)（第 02 節）、[`df.index`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.index.html#pandas.DataFrame.index)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`df[條件]`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-indexing)（第 02 節）、[`groupby().size()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.DataFrameGroupBy.size.html#pandas.api.typing.DataFrameGroupBy.size)（第 02 節）、[`pd.DataFrame()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame)（第 02 節）、[`s[標籤]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 03 節）、[`df.to_json()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.to_json.html#pandas.DataFrame.to_json)（第 04 節）、[`s.max()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.max.html#pandas.Series.max)（第 05 節）、[`s.unique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.unique.html#pandas.Series.unique)（第 06 節）、[`s.min()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.min.html#pandas.Series.min)（第 07 節）、[`整欄運算`](https://pandas.pydata.org/docs/user_guide/basics.html#flexible-binary-operations)（第 07 節）、[`df.query()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html#pandas.DataFrame.query)（第 08 節）、[`df.iterrows()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iterrows.html#pandas.DataFrame.iterrows)（第 09 節）、[`groupby()[欄].sum()`](https://pandas.pydata.org/docs/reference/api/pandas.api.typing.SeriesGroupBy.sum.html#pandas.api.typing.SeriesGroupBy.sum)（第 09 節）、[`s.idxmax()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.idxmax.html#pandas.Series.idxmax)（第 09 節） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+# ---------------------------------------------------------------- 5. 濃縮
+
+def condense(ev, table, audit):
+    """十行左右的摘要；每列的 key 可直接 ev.query(key) 回到原始事件，n 必須等於查到的筆數。"""
+    rows = []
+
+    def add(kind, item, key, note=""):
+        n = len(ev.query(key))
+        if n == 0:
+            raise PipelineError(f"摘要列追不回任何事件：{key}")
+        rows.append({"kind": kind, "item": item, "n": n, "note": note, "key": key})
+
+    people = table[table["who"] != "(未辨識)"].groupby("who")["violations"].sum()
+    people = people[people > 0].sort_values(ascending=False, kind="stable")   # 同分依工號，結果才固定
+    for who in people.head(TOP_K).index:
+        days = int(table.loc[table["who"] == who, "violation_days"].sum())
+        add("top_worker", who, f"is_violation and worker_id == '{who}'", f"{days} 天有違規")
+    if (ev["is_violation"] & (ev["worker_id"] == "")).any():
+        add("unidentified", "(未辨識)", "is_violation and worker_id == ''", "辨識不到臉，不列入排名")
+    site = table.groupby("week")[["events", "violations"]].sum()
+    if len(site) >= 2:                                  # 只有一週就沒有「週對週」
+        last, prev = site.index[-1], site.index[-2]
+        rate = site["violations"] / site["events"]
+        add("trend", f"week {last}", f"is_violation and week == '{last}'",
+            f"前週 {site.loc[prev, 'violations']} 筆；違規率 {rate[prev]:.1%}→{rate[last]:.1%}")
+    named = table[table["who"] != "(未辨識)"]          # 未辨識是很多人，單日筆數不代表同一人連續違規
+    for _, r in named[named["max_per_day"] >= BURST].iterrows():
+        burst = ev[ev["is_violation"] & (ev["worker_id"] == r["who"]) & (ev["week"] == r["week"])]
+        day = burst.groupby("date").size().idxmax()
+        hit = burst[burst["date"] == day]
+        add("anomaly", f"{r['who']} {day}", f"is_violation and worker_id == '{r['who']}' and date == '{day}'",
+            f"{hit['event_time'].min()[11:16]}–{hit['event_time'].max()[11:16]} "
+            + "、".join(sorted(hit["event_type"].unique())))
+    for a in audit:
+        if a["step"] == "修正":
+            add("data_note", "confidence 修正", "conf_fixed", f"{','.join(a['cameras'])} {a['rule']}")
+    if ev["late"].any():
+        late = ev[ev["late"]]
+        resent = sum(a["rows"] for a in audit if a["step"] == "去重")
+        add("data_note", "補傳", "late", f"{','.join(sorted(late['camera_id'].unique()))} 隔天才到；重送 {resent} 筆已去重")
+    return pd.DataFrame(rows)
+
+
+# ---------------------------------------------------------------- 6. 序列化＋預算
+
+def serialize(summary, budget=BUDGET):
+    text = summary.to_json(orient="records", lines=True, force_ascii=False)
+    tokens = estimate_tokens(text)
+    if tokens > budget:
+        raise PipelineError(f"摘要估計 {tokens} token，超過預算 {budget}")
+    return text, tokens
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| （無） | 本段只用到 Python 基礎與前幾門課學過的寫法，沒有新的函式 | — |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+print("\n== 4. 濃縮成摘要，序列化並檢查預算 ==")
+summary = condense(ev, table, audit)
+text, tokens = serialize(summary)
+print(text, end="")
+print(f"{len(summary)} 行、{len(text):,} 字元、估計 {tokens:,} token（預算 {BUDGET:,}）")
+```
+
+<sub>📄 來源：執行 `python3 19_end_to_end.py` 的輸出（第 4 段）</sub>
+
+```text
+== 4. 濃縮成摘要，序列化並檢查預算 ==
+{"kind":"top_worker","item":"W041","n":36,"note":"14 天有違規","key":"is_violation and worker_id == 'W041'"}
+{"kind":"top_worker","item":"W029","n":33,"note":"18 天有違規","key":"is_violation and worker_id == 'W029'"}
+{"kind":"top_worker","item":"W044","n":27,"note":"14 天有違規","key":"is_violation and worker_id == 'W044'"}
+{"kind":"unidentified","item":"(未辨識)","n":77,"note":"辨識不到臉，不列入排名","key":"is_violation and worker_id == ''"}
+{"kind":"trend","item":"week 2026-09-21","n":123,"note":"前週 140 筆；違規率 19.6%→17.1%","key":"is_violation and week == '2026-09-21'"}
+{"kind":"anomaly","item":"W041 2026-09-22","n":18,"note":"14:02–14:53 no_harness","key":"is_violation and worker_id == 'W041' and date == '2026-09-22'"}
+{"kind":"data_note","item":"confidence 修正","n":69,"note":"cam-02 confidence > 1 視為百分比，÷100","key":"conf_fixed"}
+{"kind":"data_note","item":"補傳","n":20,"note":"cam-05 隔天才到；重送 20 筆已去重","key":"late"}
+8 行、903 字元、估計 640 token（預算 1,500）
+```
+
+- 每列帶 `key`，`n` 必須等於查到的筆數（第 16 節）。
+- 超過預算就停，不截斷：LLM 組要的是「整批不給」，不是「給一半」。
+
+## 五、重跑兩次，指紋相同
+
+**問題：** 同一份資料重跑，結果一樣嗎？
+
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：零、一、二、三、四"] --> C["五、指紋"] --> N["接下來：六"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["run(path) 第 1 次"] --> F["fingerprint()"]
+    B["run(path) 第 2 次"] --> F
+    C["輸入倒序"] --> F
+    F --> G(["三次指紋相同"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class G good
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`.hexdigest()`](https://docs.python.org/3.12/library/hashlib.html#hashlib.hash.hexdigest)（爬蟲 15）、[`hashlib.sha256()`](https://docs.python.org/3.12/library/hashlib.html#hashlib.sha256)（爬蟲 15）、[`s.encode()`](https://docs.python.org/3.12/library/stdtypes.html#str.encode)（爬蟲 15） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+def run(source, budget=BUDGET, checks=()):
+    """整條管線。checks 是額外的驗證函式（收 ev、不合格就拋 PipelineError）。回傳 (摘要 JSONL, 估計 token, 每人每週表, audit)。"""
+    known, violation = read_event_types()
+    ev, audit = clean(read_events(source))
+    ev = validate(ev, known, violation)
+    for check in checks:
+        check(ev)
+    table = weekly(ev)
+    text, tokens = serialize(condense(ev, table, audit), budget)
+    return text, tokens, table, audit
+
+
+def fingerprint(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| `reversed(序列)` | 倒過來的順序 | [文件](https://docs.python.org/3.12/library/functions.html#reversed) |
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`io.StringIO()`](https://docs.python.org/3.12/library/io.html#io.StringIO)（第 07 節） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+print("\n== 5. 重跑兩次，指紋相同 ==")
+runs = [run(path)[0], run(path)[0], run(io.StringIO("\n".join(reversed(lines)) + "\n"))[0]]
+for label, out in zip(["第 1 次", "第 2 次", "輸入倒序"], runs):
+    print(f"{label}  {fingerprint(out)}")
+```
+
+<sub>📄 來源：執行 `python3 19_end_to_end.py` 的輸出（第 5 段）</sub>
+
+```text
+== 5. 重跑兩次，指紋相同 ==
+第 1 次  deea741b228d613d
+第 2 次  deea741b228d613d
+輸入倒序  deea741b228d613d
+```
+
+- 連輸入順序都不影響結果：清理時先依到達時間排序、排名同分依工號。
+
+## 六、故意餵壞資料：全部擋下
+
+**問題：** 六種壞資料＋預算不足，擋得下嗎？
+
+**在流程中的位置：**
+
+```mermaid
+flowchart LR
+    P["已完成：零、一、二、三、四、五"] --> C["六、餵壞資料"] --> N["接下來：—"]
+    classDef other fill:#f4f4f4,stroke:#cccccc,color:#888888
+    class P,N other
+    style C fill:#ffd54f,stroke:#e69500,stroke-width:3px,color:#000
+```
+
+**這段做了什麼：**
+
+```mermaid
+flowchart TD
+    A["少時區・未知類型・缺欄位<br/>同 id 不同內容・字串 confidence<br/>confidence 超出範圍"] --> R["run()"]
+    B["預算 500"] --> R
+    R --> X(["7 種全部 PipelineError"])
+    classDef bad fill:#fde2e1,stroke:#c0392b
+    classDef good fill:#ddf3e4,stroke:#27ae60
+    class X good
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`json.loads()`](https://docs.python.org/3.12/library/json.html#json.loads)（爬蟲 03） |
+
+<!-- 節錄: 19_end_to_end.py -->
+```python
+print("\n== 6. 故意餵壞資料：全部擋下 ==")
+first = json.loads(lines[0])
+cases = [
+    ("少了時區", broken(lines, 5, event_time="2026-08-31T07:30:00")),
+    ("未知 event_type", broken(lines, 5, event_type="no_vest")),
+    ("缺欄位", broken(lines, 5, worker_id=None)),
+    ("同 event_id 內容不同", broken(lines, 5, event_id=first["event_id"])),
+    ("confidence 是字串", broken(lines, 5, confidence="0.8")),
+    ("confidence 超出範圍", broken(lines, 5, confidence=-0.3)),
+]
+for label, src in cases:
+    try:
+        run(src)
+        print(f"{label:18} 沒擋下！")
+    except PipelineError as e:
+        print(f"{label:18} 擋下：{e}")
+try:
+    run(path, budget=500)
+except PipelineError as e:
+    print(f"{'預算只有 500':18} 擋下：{e}")
+```
+
+<sub>📄 來源：執行 `python3 19_end_to_end.py` 的輸出（第 6 段）</sub>
+
+```text
+== 6. 故意餵壞資料：全部擋下 ==
+少了時區               擋下：event_time 沒有時區：cam-03-20260831-0018 '2026-08-31T07:30:00'
+未知 event_type      擋下：未知 event_type ['no_vest']，白名單 ['no_harness', 'no_helmet', 'ppe_ok', 'restricted_entry']
+缺欄位                擋下：worker_id 有空值（某一行少了這個鍵）：第 6 行
+同 event_id 內容不同    擋下：業務鍵 event_id 不唯一（內容不同的同一事件）：cam-05-20260831-0004
+confidence 是字串     擋下：confidence 不是數字：第 6 行 '0.8'
+confidence 超出範圍    擋下：confidence 超出 0–1：cam-03-20260831-0018
+預算只有 500           擋下：摘要估計 640 token，超過預算 500
+```
+
+- 驗證要能證明自己有用：**故意弄壞，看它會不會擋**。
+
+## Workshop：加兩道你自己的檢查
+
+> 本節是**總驗收**：整段 Workshop 都是驗收，不另分課堂題與延伸題的時間；課堂題是最低要求。
+
+### 題目
+
+**課堂題**（約 10 分鐘）：執行起手式：兩個檢查還沒寫，三種壞資料都「沒擋下」。補完 `known_zone()` 與 `not_sunday()`，再執行：原始檔的指紋**不能變**（規則不能擋掉正常資料）；Z9 和週日要被擋。W999 呢？決定要不要擋，並寫下理由。
+
+起手式 [`19_workshop_checks.py`](https://github.com/4-learn/data-analysis-and-process-demo/blob/master/2026/19_workshop_checks.py)（在 `2026/` 資料夾執行）：
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`import_module()`](https://docs.python.org/3.12/library/importlib.html#importlib.import_module)（第 04 節）、[`path.read_text()`](https://docs.python.org/3.12/library/pathlib.html#pathlib.Path.read_text)（第 04 節）、[`json.loads()`](https://docs.python.org/3.12/library/json.html#json.loads)（爬蟲 03） |
+
+<!-- workshop: 19_workshop_checks.py -->
+```python
+"""第 19 節 Workshop：加兩道你自己的檢查。把兩個 TODO 補完，再執行一次。
+原始檔的指紋不能變；Z9 和週日要被擋下。"""
+
+import json
+from importlib import import_module
+
+demo = import_module("19_end_to_end")   # 檔名以數字開頭，改用 import_module 匯入
+
+ZONES = set(json.loads((demo.DATA / "MANIFEST.json").read_text(encoding="utf-8"))["zones"])
+
+
+def known_zone(ev):
+    pass   # TODO：zone 不在 ZONES 就 raise demo.PipelineError(...)
+
+
+def not_sunday(ev):
+    pass   # TODO：工地週日停工；ev["date"] 是台北時間的 'YYYY-MM-DD'
+
+
+if __name__ == "__main__":
+    lines = (demo.DATA / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    print("原始檔指紋：", demo.fingerprint(demo.run(demo.DATA / "events.jsonl", checks=[known_zone, not_sunday])[0]))
+    for label, src in [("Z9", demo.broken(lines, 5, zone="Z9")),
+                       ("週日", demo.broken(lines, 5, event_time="2026-09-06T07:30:00+08:00")),
+                       ("worker W999", demo.broken(lines, 5, worker_id="W999"))]:
+        try:
+            demo.run(src, checks=[known_zone, not_sunday])
+            print(label, "沒擋下")
+        except demo.PipelineError as e:
+            print(label, "擋下：", e)
+```
+
+**延伸題**（做完課堂題再做）：請 OpenCode 寫「events.jsonl → 每人每週彙總 → 給 LLM 的摘要 JSONL，要能擋壞資料」。拿 Demo 第六段的壞資料逐一餵它的版本，檢查：它怎麼去重？「同 `event_id` 內容不同」會發生什麼？有沒有 `force_ascii=False`？超過預算時是報錯還是截斷？壞資料時是拋例外，還是 `print` 一行警告然後繼續？
+
+### 預期輸出
+
+課堂題：
+
+<sub>📄 來源：執行 `python3 19_workshop_checks.py` 的輸出</sub>
+
+```text
+原始檔指紋： deea741b228d613d
+Z9 沒擋下
+週日 沒擋下
+worker W999 沒擋下
+```
+
+補完兩個檢查後：指紋仍是 `deea741b228d613d`；Z9、週日擋下；W999 是否擋下，取決於你的決定。
+
+### 參考判讀
+
+:::spoiler 教師用（點開）
+- 兩道檢查的一種寫法（教師實測，兩個環境相同）：
+
+  <!-- fn-table -->
+  | 函式名稱 | 說明 | 官方文件連結 |
+  |---|---|---|
+  | `d.weekday()` | 星期幾：週一是 0、週日是 6 | [文件](https://docs.python.org/3.12/library/datetime.html#datetime.date.weekday) |
+  | `date.fromisoformat("2026-09-27")` | `YYYY-MM-DD` 字串轉成 `date`；之後可以用 `.weekday()` 算星期幾（週日是 6） | [文件](https://docs.python.org/3.12/library/datetime.html#datetime.date.fromisoformat) |
+  | 前面介紹過 | 用法同前，括號內是在哪裡第一次介紹 | [`& \| ~`](https://pandas.pydata.org/docs/user_guide/indexing.html#boolean-operators)（第 02 節）、[`.iloc[]`](https://pandas.pydata.org/docs/reference/api/pandas.Series.iloc.html#pandas.Series.iloc)（第 02 節）、[`.loc[]`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html#pandas.DataFrame.loc)（第 02 節）、[`df["欄"]`](https://pandas.pydata.org/docs/user_guide/indexing.html#basics)（第 02 節）、[`.any()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.any.html#pandas.Series.any)（第 03 節）、[`s.map()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.map.html#pandas.Series.map)（第 04 節）、[`s.unique()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.unique.html#pandas.Series.unique)（第 06 節）、[`s.isin()`](https://pandas.pydata.org/docs/reference/api/pandas.Series.isin.html#pandas.Series.isin)（第 08 節） |
+
+  ```python
+  # 本節測試不涵蓋這段
+  from datetime import date
+
+  def known_zone(ev):
+      bad = ~ev["zone"].isin(ZONES)
+      if bad.any():
+          raise PipelineError(f"未知 zone {sorted(ev.loc[bad, 'zone'].unique())}")
+
+  def not_sunday(ev):
+      bad = ev["date"].map(lambda d: date.fromisoformat(d).weekday() == 6)
+      if bad.any():
+          raise PipelineError(f"週日停工卻有事件：{ev.loc[bad, 'event_id'].iloc[0]}")
+  ```
+
+  輸出：指紋 `deea741b228d613d`（不變）；`Z9 擋下： 未知 zone ['Z9']`；`週日 擋下： 週日停工卻有事件：cam-03-20260831-0018`；`worker W999 沒擋下`。
+- **W999 該不該擋？** 管線目前不檢查名冊，W999 會被當成一個新的人進入統計。可以用 `workers.csv` 擋，但要先想清楚：名冊會落後於現場（新進人員還沒登錄），擋下整批的代價可能比放行一筆高。比較好的做法是**放行並寫進 audit／資料註記**。這是取捨，沒有標準答案，但要寫得出理由。
+- **不是每種「看起來不一樣」都是壞資料**：把第 6 行的時間改成同一時刻的 UTC 寫法 `2026-08-30T23:54:26Z`，管線不會擋，指紋也不變（教師實測）——因為它換算成台北時間後是同一刻。驗證要檢查的是**意義**，不是字面格式。
+- **多送一次同一行**（模擬再一次重送）不會被擋，但指紋會變（`78398ed17d238166`）：唯一不同的是補傳那一列的說明從「重送 20 筆」變成「重送 21 筆」。這是對的——輸入不一樣，audit 就該不一樣；摘要的其他 7 行完全相同。
+- AI 版本最常見的錯：用 `drop_duplicates("event_id")` 去重。餵它「同 `event_id` 內容不同」的資料，它會得到 2,817 列，**安靜地丟掉其中一筆**，不報錯（教師實測）。Demo 的 `clean()` 只去除「除 `ingested_at` 外完全相同」的列，衝突留給 `validate()` 擋下。
+- AI 版本另一個常見寫法是驗證失敗時 `print("warning: ...")` 然後繼續。LLM 組要的是「有問題就整批不要給」。
+:::
+
+### 驗收
+
+- 原始檔指紋仍是 `deea741b228d613d`；Z9 與週日被擋。
+- 對 W999 有決定，並寫下理由（一句話）。
+- （延伸）Demo 第六段的 7 種情況逐一餵過 AI 版本，列出哪幾種它沒擋下。
+
+## 附錄：完整程式
+
+```bash
+python3 19_end_to_end.py
+```
+
+<!-- fn-table -->
+| 函式名稱 | 說明 | 官方文件連結 |
+|---|---|---|
+| （同上） | 這支程式用到的函式，都已在上面各段的表格介紹過 | — |
+
+<!-- demo: 19_end_to_end.py -->
+```python
+"""第 19 節：從 events.jsonl 到給 LLM 的摘要——一支可重跑、會擋壞資料的程式。
+
+讀取 → 清理 → 驗證 → 彙總 → 濃縮 → 序列化＋預算檢查。
+每一步是一個函式；任何一步發現問題就拋例外，不產出摘要。
+"""
+
+import hashlib
+import io
+import json
+import math
+from pathlib import Path
+
+import pandas as pd
+
+DATA = Path(__file__).resolve().parent / "data" / "events"
+REQUIRED = ["event_id", "zone", "camera_id", "worker_id", "event_type", "confidence", "event_time", "ingested_at"]
+NULLABLE = {"confidence"}          # cam-08 舊模型沒記錄；其他必要欄位一律不准是空值
+TOP_K = 3
+BURST = 5           # 同一人同一天違規達 5 筆列為異常（看過分布才定的，見第 16 節）
+BUDGET = 1500       # 摘要的估計 token 上限（LLM 組給的數字）
+
+
+class PipelineError(ValueError):
+    """資料不符合規格或超出預算：整批擋下，不產出任何摘要。"""
+
+
+def estimate_tokens(text):
+    """第 17 節的保守粗估：非 ASCII 字元與數字各算 1、其他 ASCII 算 0.5，再乘 1.2。"""
+    heavy = sum(1 for ch in text if not ch.isascii() or ch.isdigit())
+    return math.ceil((heavy + (len(text) - heavy) * 0.5) * 1.2)
+
+
+# ---------------------------------------------------------------- 1. 讀取
+
+def read_events(source):
+    """不讓 pandas 猜型別、不看欄名轉日期（第 03、04 節），讀完立刻檢查欄位與型別。"""
+    raw = pd.read_json(source, lines=True, dtype=False, convert_dates=False)
+    missing = [c for c in REQUIRED if c not in raw.columns]
+    if missing:
+        raise PipelineError(f"缺少欄位 {missing}")
+    for col in REQUIRED:
+        if col not in NULLABLE and raw[col].isna().any():     # JSONL 某一行少了這個鍵 → 那一格是 NaN
+            raise PipelineError(f"{col} 有空值（某一行少了這個鍵）：第 {raw.index[raw[col].isna()][0] + 1} 行")
+    conf = raw["confidence"].dropna()
+    not_num = ~conf.map(type).isin([int, float])      # 整欄都是 null 時 pandas 3 讀成 object，所以逐格看
+    if not_num.any():
+        raise PipelineError(f"confidence 不是數字：第 {not_num.index[not_num][0] + 1} 行 {conf[not_num].iloc[0]!r}")
+    raw["confidence"] = raw["confidence"].astype(float)
+    for col in set(REQUIRED) - NULLABLE:
+        not_str = ~raw[col].map(type).eq(str)
+        if not_str.any():
+            raise PipelineError(f"{col} 不是字串：第 {raw.index[not_str][0] + 1} 行 {raw.loc[not_str, col].iloc[0]!r}")
+    return raw
+
+
+def read_event_types():
+    types = pd.read_csv(DATA / "event-types.csv", dtype=str, keep_default_na=False)
+    return set(types["event_type"]), set(types.loc[types["is_violation"] == "true", "event_type"])
+
+
+# ---------------------------------------------------------------- 2. 清理
+
+def clean(raw):
+    """只去掉「重送」：除了 ingested_at 以外完全相同的列。修正 cam-02 的百分比。每一項都記進 audit。"""
+    audit = []
+    same = [c for c in raw.columns if c != "ingested_at"]
+    arrived = pd.to_datetime(raw["ingested_at"], utc=True, format="ISO8601")
+    raw = raw.iloc[arrived.argsort(kind="stable")]         # 依到達時間排，「留最先到達」才不看輸入順序
+    resend = raw.duplicated(subset=same, keep="first")
+    if resend.any():
+        audit.append({"step": "去重", "rule": "除 ingested_at 外完全相同，留最先到達的一筆",
+                      "rows": int(resend.sum()), "cameras": sorted(raw.loc[resend, "camera_id"].unique())})
+    ev = raw[~resend].copy()
+    pct = ev["confidence"] > 1
+    if pct.any():
+        ev.loc[pct, "confidence"] = ev.loc[pct, "confidence"] / 100
+        audit.append({"step": "修正", "rule": "confidence > 1 視為百分比，÷100",
+                      "rows": int(pct.sum()), "cameras": sorted(ev.loc[pct, "camera_id"].unique())})
+    ev["conf_fixed"] = pct
+    return ev.reset_index(drop=True), audit
+
+
+# ---------------------------------------------------------------- 3. 驗證
+
+def validate(ev, known_types, violation_types):
+    """業務規則（清理之後）。全部通過才回傳加了 date／week／late／is_violation 的新表。"""
+    dup = ev["event_id"].duplicated(keep=False)
+    if dup.any():
+        raise PipelineError(f"業務鍵 event_id 不唯一（內容不同的同一事件）：{ev.loc[dup, 'event_id'].iloc[0]}")
+    for col in ("event_time", "ingested_at"):
+        no_tz = ~ev[col].str.contains(r"(?:[+-]\d\d:\d\d|Z)$")
+        if no_tz.any():
+            raise PipelineError(f"{col} 沒有時區：{ev.loc[no_tz, 'event_id'].iloc[0]} {ev.loc[no_tz, col].iloc[0]!r}")
+    unknown = ~ev["event_type"].isin(known_types)
+    if unknown.any():
+        raise PipelineError(f"未知 event_type {sorted(ev.loc[unknown, 'event_type'].unique())}，白名單 {sorted(known_types)}")
+    bad = ev["confidence"].notna() & ~ev["confidence"].between(0, 1)
+    if bad.any():
+        raise PipelineError(f"confidence 超出 0–1：{ev.loc[bad, 'event_id'].iloc[0]}")
+    t = pd.to_datetime(ev["event_time"], format="ISO8601", utc=True).dt.tz_convert("Asia/Taipei")
+    arrived = pd.to_datetime(ev["ingested_at"], format="ISO8601", utc=True)
+    return ev.assign(
+        date=t.dt.strftime("%Y-%m-%d"),
+        week=(t.dt.normalize() - pd.to_timedelta(t.dt.weekday, unit="D")).dt.strftime("%Y-%m-%d"),
+        late=(arrived - t) > pd.Timedelta(hours=1),
+        is_violation=ev["event_type"].isin(violation_types),
+    )
+
+
+# ---------------------------------------------------------------- 4. 彙總
+
+def weekly(ev):
+    """每人每週一列。辨識不到臉的事件記在 '(未辨識)' 名下，不丟掉。"""
+    v = ev.assign(who=ev["worker_id"].replace("", "(未辨識)"))
+    bad = v[v["is_violation"]]
+    keys = ["who", "week"]
+    table = pd.concat([
+        v.groupby(keys).size().rename("events"),
+        bad.groupby(keys).size().rename("violations"),
+        bad.groupby(keys)["date"].nunique().rename("violation_days"),
+        bad.groupby(keys + ["date"]).size().groupby(keys).max().rename("max_per_day"),
+    ], axis=1).fillna(0).astype(int).reset_index()
+    return table.sort_values(keys, ignore_index=True)
+
+
+# ---------------------------------------------------------------- 5. 濃縮
+
+def condense(ev, table, audit):
+    """十行左右的摘要；每列的 key 可直接 ev.query(key) 回到原始事件，n 必須等於查到的筆數。"""
+    rows = []
+
+    def add(kind, item, key, note=""):
+        n = len(ev.query(key))
+        if n == 0:
+            raise PipelineError(f"摘要列追不回任何事件：{key}")
+        rows.append({"kind": kind, "item": item, "n": n, "note": note, "key": key})
+
+    people = table[table["who"] != "(未辨識)"].groupby("who")["violations"].sum()
+    people = people[people > 0].sort_values(ascending=False, kind="stable")   # 同分依工號，結果才固定
+    for who in people.head(TOP_K).index:
+        days = int(table.loc[table["who"] == who, "violation_days"].sum())
+        add("top_worker", who, f"is_violation and worker_id == '{who}'", f"{days} 天有違規")
+    if (ev["is_violation"] & (ev["worker_id"] == "")).any():
+        add("unidentified", "(未辨識)", "is_violation and worker_id == ''", "辨識不到臉，不列入排名")
+    site = table.groupby("week")[["events", "violations"]].sum()
+    if len(site) >= 2:                                  # 只有一週就沒有「週對週」
+        last, prev = site.index[-1], site.index[-2]
+        rate = site["violations"] / site["events"]
+        add("trend", f"week {last}", f"is_violation and week == '{last}'",
+            f"前週 {site.loc[prev, 'violations']} 筆；違規率 {rate[prev]:.1%}→{rate[last]:.1%}")
+    named = table[table["who"] != "(未辨識)"]          # 未辨識是很多人，單日筆數不代表同一人連續違規
+    for _, r in named[named["max_per_day"] >= BURST].iterrows():
+        burst = ev[ev["is_violation"] & (ev["worker_id"] == r["who"]) & (ev["week"] == r["week"])]
+        day = burst.groupby("date").size().idxmax()
+        hit = burst[burst["date"] == day]
+        add("anomaly", f"{r['who']} {day}", f"is_violation and worker_id == '{r['who']}' and date == '{day}'",
+            f"{hit['event_time'].min()[11:16]}–{hit['event_time'].max()[11:16]} "
+            + "、".join(sorted(hit["event_type"].unique())))
+    for a in audit:
+        if a["step"] == "修正":
+            add("data_note", "confidence 修正", "conf_fixed", f"{','.join(a['cameras'])} {a['rule']}")
+    if ev["late"].any():
+        late = ev[ev["late"]]
+        resent = sum(a["rows"] for a in audit if a["step"] == "去重")
+        add("data_note", "補傳", "late", f"{','.join(sorted(late['camera_id'].unique()))} 隔天才到；重送 {resent} 筆已去重")
+    return pd.DataFrame(rows)
+
+
+# ---------------------------------------------------------------- 6. 序列化＋預算
+
+def serialize(summary, budget=BUDGET):
+    text = summary.to_json(orient="records", lines=True, force_ascii=False)
+    tokens = estimate_tokens(text)
+    if tokens > budget:
+        raise PipelineError(f"摘要估計 {tokens} token，超過預算 {budget}")
+    return text, tokens
+
+
+def run(source, budget=BUDGET, checks=()):
+    """整條管線。checks 是額外的驗證函式（收 ev、不合格就拋 PipelineError）。回傳 (摘要 JSONL, 估計 token, 每人每週表, audit)。"""
+    known, violation = read_event_types()
+    ev, audit = clean(read_events(source))
+    ev = validate(ev, known, violation)
+    for check in checks:
+        check(ev)
+    table = weekly(ev)
+    text, tokens = serialize(condense(ev, table, audit), budget)
+    return text, tokens, table, audit
+
+
+def fingerprint(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def broken(lines, line_no, **changes):
+    """在記憶體中複製一份並弄壞第 line_no 行（不寫檔）。changes 的值為 None 代表刪掉該欄。"""
+    out = list(lines)
+    rec = json.loads(out[line_no])
+    for k, v in changes.items():
+        if v is None:
+            rec.pop(k, None)
+        else:
+            rec[k] = v
+    out[line_no] = json.dumps(rec, ensure_ascii=False)
+    return io.StringIO("\n".join(out) + "\n")
+
+
+if __name__ == "__main__":
+    path = DATA / "events.jsonl"
+    lines = path.read_text(encoding="utf-8").splitlines()
+
+    print("== 1. AI 的一行版：壞資料照樣產出摘要 ==")
+    for label, src in [("原始檔", path),
+                       ("第 6 行少了時區", broken(lines, 5, event_time="2026-08-31T07:30:00")),
+                       ("第 6 行 event_type='no_vest'", broken(lines, 5, event_type="no_vest"))]:
+        df = pd.read_json(src, lines=True)
+        top = df[df["event_type"] != "ppe_ok"].groupby("worker_id").size().nlargest(2).to_dict()
+        kind = "日期" if pd.api.types.is_datetime64_any_dtype(df["event_time"]) else "文字"
+        print(f"{label:24} event_time 是{kind}  違規 {int((df['event_type'] != 'ppe_ok').sum())}  {top}")
+
+    print("\n== 2. 清理與 audit ==")
+    known, violation = read_event_types()
+    raw = read_events(path)
+    ev, audit = clean(raw)
+    for a in audit:
+        print(a)
+    print(f"{len(raw)} 列 → {len(ev)} 列；event_id 唯一：{ev['event_id'].is_unique}")
+
+    print("\n== 3. 驗證通過，彙總成每人每週 ==")
+    ev = validate(ev, known, violation)
+    table = weekly(ev)
+    roster = pd.read_csv(DATA / "workers.csv", dtype=str, keep_default_na=False)
+    absent = sorted(set(roster["worker_id"]) - set(table["who"]))
+    print(f"{len(table)} 列；違規合計 {table['violations'].sum()}，與事件表 {int(ev['is_violation'].sum())} 筆一致")
+    print(f"名冊 {roster['worker_id'].nunique()} 人，表上 {table['who'].nunique() - 1} 人＋(未辨識)；不在表上：{absent[0]}–{absent[-1]} 共 {len(absent)} 人")
+    print(table[table["who"].isin(["W041", "(未辨識)"])].to_string(index=False))
+
+    print("\n== 4. 濃縮成摘要，序列化並檢查預算 ==")
+    summary = condense(ev, table, audit)
+    text, tokens = serialize(summary)
+    print(text, end="")
+    print(f"{len(summary)} 行、{len(text):,} 字元、估計 {tokens:,} token（預算 {BUDGET:,}）")
+
+    print("\n== 5. 重跑兩次，指紋相同 ==")
+    runs = [run(path)[0], run(path)[0], run(io.StringIO("\n".join(reversed(lines)) + "\n"))[0]]
+    for label, out in zip(["第 1 次", "第 2 次", "輸入倒序"], runs):
+        print(f"{label}  {fingerprint(out)}")
+
+    print("\n== 6. 故意餵壞資料：全部擋下 ==")
+    first = json.loads(lines[0])
+    cases = [
+        ("少了時區", broken(lines, 5, event_time="2026-08-31T07:30:00")),
+        ("未知 event_type", broken(lines, 5, event_type="no_vest")),
+        ("缺欄位", broken(lines, 5, worker_id=None)),
+        ("同 event_id 內容不同", broken(lines, 5, event_id=first["event_id"])),
+        ("confidence 是字串", broken(lines, 5, confidence="0.8")),
+        ("confidence 超出範圍", broken(lines, 5, confidence=-0.3)),
+    ]
+    for label, src in cases:
+        try:
+            run(src)
+            print(f"{label:18} 沒擋下！")
+        except PipelineError as e:
+            print(f"{label:18} 擋下：{e}")
+    try:
+        run(path, budget=500)
+    except PipelineError as e:
+        print(f"{'預算只有 500':18} 擋下：{e}")
+```
+
+## 教師紀錄與下一步
+
+:::spoiler 實測環境、版本差異、資料來源（點開）
+**實測**：2026-10-05，Ubuntu 20.04，Python 3.11.8，pandas 3.0.6、numpy 2.4.6。本頁所有輸出為該環境實際執行貼上（**本機實測**）。另以 Python 3.10.15／pandas 2.3.3 執行，標準輸出**逐字相同**，指紋相同。
+
+**pandas 2.3.3 差異**（Demo 已避開，未進輸出）：
+
+- 第 2 段 AI 一行版中，少了時區後的 `event_time` dtype 在 pandas 3.0.6 是 `str`、2.3.3 是 `object`；兩版都**不報錯**。Demo 改印「日期／文字」避開版本字串。
+- 讀取時若 `confidence` **整欄都是 null**（例如只有 cam-08 的一批），`dtype=False` 下 pandas 3.0.6 讀成 `object`、2.3.3 讀成 `float64`。所以 `read_events()` 不檢查欄位 dtype，而是**逐格檢查型別**，再 `astype(float)`；兩版行為一致（教師實測：只含 cam-08 的 11 筆可以跑完）。
+
+**token 數字的等級**：第 17 節的**粗估**，不是 tokenizer 實測；1,500 是本節假設的預算。
+
+**資料**：`data/events/` 為 `tools/build_events.py` 產生的**合成資料**（雜湊見 `data/events/MANIFEST.json`）。所有壞資料都在記憶體中由原始檔複製後修改，不寫檔。摘要的排名與趨勢**不代表任何真實工地的統計結論**。
+
+**界線**：
+
+- Demo 單檔、不 import 其他講義；`estimate_tokens()`、`condense()` 是第 16、17 節的精簡重寫，欄名改為英文（摘要給程式也給 LLM 讀）；`condense()` 省略了第 16 節的 Top 區與 Top 時段兩列，`clean()` 的去重定義也與第 16 節不同（見第三段）。
+- 異常門檻（單日 5 筆）與預算（1,500）都是針對這份資料定的，不是通用值。
+- 本節不把檢查寫成 pytest 檔；Workshop 的 `checks` 是函式，學生可以照第 10 節的方式包成測試，這是課後延伸。
+- `ev.query(key)` 的前提是值裡沒有單引號（見第 16 節界線）。
+- 本節**尚未實班試教**。
+
+:::
+
+**下一節**：本課結束。產出的摘要 JSONL 與「每列帶 key」的格式，交給 LLM 課 RAG 模組（第 16–23 節）；條文切塊參數見本課第 18 節。

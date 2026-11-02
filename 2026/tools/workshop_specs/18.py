@@ -1,0 +1,7 @@
+LESSON = '18-text-corpus.md'
+TITLE = '替一部法規挑 chunk size'
+STARTER = '18_workshop_by_law.py'
+CLASS = '執行起手式，看每部法規的條數、中位數、p95、最大值。回答：如果 LLM 組只做「營造安全衛生設施標準」問答，450 還適合嗎？用分布證據說明。'
+EXTENSION = '\n\n1. 用 `chunk_articles(df, size)` 分別跑 300、450、500，交一張表：總塊數、被切成多塊的條文數、孤兒塊數、最長一塊幾字。\n2. 請 OpenCode 寫「把通報文字去識別化」，拿它的版本跑 Demo 第五段的 `residuals()`：`reporter` 欄處理了沒？工號 `W002` 還在嗎？X001 的「張美華」擋得住嗎？它是不是宣稱「已完成匿名化」？'
+ACCEPT = '- 用 p95（營造安全衛生設施標準 524）說明 450 對這部法規偏小。\n- （延伸）三種 chunk size 的比較表；AI 版本四項檢查都有結論。'
+STARTER_CODE = '"""第 18 節 Workshop 課堂題：每部法規的條文長度分布（條數、中位數、p95、最大值）。"""\n\nfrom importlib import import_module\n\ndemo = import_module("18_text_corpus")   # 檔名以數字開頭，改用 import_module 匯入\n\nif __name__ == "__main__":\n    df = demo.read_articles()\n    length = df["content"].str.len()\n    print(length.groupby(df["law_name"], sort=False).describe(percentiles=[0.5, 0.95]).round(0).to_string())\n'

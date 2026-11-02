@@ -1,0 +1,8 @@
+LESSON = '13-groupby-denominator.md'
+TITLE = '區域 × 週的違規表'
+STARTER = '13_workshop_zone_week.py'
+CLASS = '起手式已算好「區域 × 週」的事件數。在 `agg(...)` 裡加上 `違規數=("is_violation", "sum")` 與 `違規率=("is_violation", "mean")`，再執行。然後寫一行 `assert table["事件數"].sum() == 2818`，並用一句話寫出：違規率的分母是什麼？'
+CLASS_ANSWER = '加上兩欄後最高的一格是 Z4 第 4 週（09-21～09-27），違規率 0.323。'
+EXTENSION = '請 OpenCode 寫「讀 events.jsonl，算每個工人的違規次數與違規率，列出前三名」，檢查四件事：有沒有去重？`count` 用在哪一欄？「違規」怎麼判定？結果裡有沒有一個叫 `""` 的人、有沒有 W053？'
+ACCEPT = '- 表 16 列，附一句分母說明，`assert` 通過。\n- （延伸）AI 版本的四件事都檢查過，至少指出兩個錯。'
+STARTER_CODE = '"""第 13 節 Workshop 課堂題：區域 × 週的彙總表。已經算好事件數；請加上違規數與違規率兩欄。"""\n\nfrom importlib import import_module\n\nimport pandas as pd\n\ndemo = import_module("13_groupby_denominator")   # 檔名以數字開頭，改用 import_module 匯入\n\nif __name__ == "__main__":\n    raw, ev = demo.read_events()\n    ev["is_violation"] = ev["event_type"].isin(demo.violation_types())\n    t = pd.to_datetime(ev["event_time"], format="ISO8601").dt.tz_convert("Asia/Taipei")\n    ev["week"] = t.dt.tz_localize(None).dt.to_period("W-SUN").astype(str)\n    table = ev.groupby(["zone", "week"]).agg(事件數=("event_id", "size"))   # TODO：加上 違規數、違規率\n    print(table.to_string())\n    print(f"{len(table)} 列；事件數合計 {table[\'事件數\'].sum()}")\n'

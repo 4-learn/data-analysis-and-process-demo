@@ -1,0 +1,8 @@
+LESSON = '07-explore.md'
+TITLE = '五個觀察、三個問題'
+STARTER = '07_workshop_explore.py'
+RUN_NOTE = '（`python3 -i` 會停在 `>>>` 讓你繼續下指令）'
+CLASS = '用 `python3 -i 07_workshop_explore.py` 進入互動模式（`raw` 已經讀好），交一份報告：\n\n```text\n已確認的觀察（每條附：用哪個指令、看到什麼數字）\n1.\n2.\n3.\n\n目前不能回答的問題（每條附：缺什麼資訊才能回答、該問誰）\n1.\n```\n\n規則：**觀察**是任何人跑同一個指令都會得到的事實；「因為…所以…」「應該是…」都是**推測**，要放進問題。'
+EXTENSION = '補到五個觀察、三個問題；然後把這份 CSV 丟給 OpenCode，請它「探索這份資料並計算平均信心度與每區違規數」，檢查：\n\n| 檢查 | 怎麼確認 |\n| --- | --- |\n| 信心度怎麼轉的？ | `errors="coerce"` 會讓 692 筆全變 NaN |\n| 平均信心度是多少？ | 應為 0.774（或 77.4%）、基於 629 筆；若是 0.704 代表補了 0 |\n| 有沒有 `dropna()`？ | 施工架違規應為 21；若是 14 代表被砍了 |\n| 「人員」欄有沒有缺值？ | AI 若只看 `isna()` 會說 0 |\n| 報告裡有沒有推測當事實？ | 例如「cam-08 故障」 |'
+ACCEPT = '- 至少三個觀察，每個都附指令與數字；至少一個問題，附「該問誰」。\n- 沒有把推測寫成觀察。\n- （延伸）五個觀察、三個問題；AI 驗收表五列都有結論。'
+STARTER_CODE = '"""第 07 節 Workshop 課堂題：探索報告的起點。執行後會停在 >>> 提示字元，raw 已經讀好，接著自己下指令。\n執行：python3 -i 07_workshop_explore.py"""\n\nfrom importlib import import_module\n\ndemo = import_module("07_explore")   # 檔名以數字開頭，改用 import_module 匯入\n\nraw = demo.read_raw(demo.EXPORT)\nprint(f"raw 已讀入：{raw.shape}；欄位 {raw.columns.tolist()}")\nprint("試試：raw[\'區域\'].value_counts()、raw.groupby(\'區域\')[\'攝影機\'].nunique()、raw[\'發生時間\'].min()")\n'
