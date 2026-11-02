@@ -1,0 +1,8 @@
+LESSON = '09-missing-anomaly.md'
+TITLE = '補 0 vs `dropna`，交出被丟的列'
+STARTER = '09_workshop_two_treatments.py'
+CLASS = '起手式已算好「原始」與「A 補 0」兩列。照著 A 的寫法加上 B：`dropna(subset=["confidence"])`，再執行。回答：哪一種讓「施工架的模型最不可靠」？哪一種讓「施工架的違規比較少」？'
+CLASS_ANSWER = '加上 B 之後：B 剩 2587 列，平均信心度 0.774 不變，但違規 496 → 452、Z4 違規 114 → 70、Z4 no_harness 86 → 56。A 讓 Z4 平均掉到 0.399（看起來最不可靠），B 讓施工架違規變少。'
+EXTENSION = '\n\n1. 把 B 寫成一個函式，回傳 `(結果, 紀錄, 被丟的列)`，紀錄至少有「進、出、丟棄、理由」；被丟的列依 `camera_id` × `event_type` 計數。\n2. 請 OpenCode「清理 `events.jsonl`：去除重複、處理缺值、移除異常值」，驗收：輸出幾列？W041 在 09-22 的 18 筆還在嗎？去重用的是整列還是 `event_id`？它有沒有告訴你丟了哪些列、為什麼？'
+ACCEPT = '- 加上 B 後印出三列，並回答兩個問題：補 0 改的是**數值**，`dropna` 改的是**事件數**。\n- （延伸）交出被丟棄列的清單與理由。\n- （延伸）AI 版本四個問題都有答案，至少找到一個它默默丟掉的東西。'
+STARTER_CODE = '"""第 09 節 Workshop 課堂題：同一份資料，補 0（A）與 dropna（B）各會讓數字變成怎樣？\n已經寫好 A；照著 A 複製一份，改成 B。"""\n\nfrom importlib import import_module\n\ndemo = import_module("09_missing_anomaly")   # 檔名以數字開頭，改用 import_module 匯入\n\n\ndef report(label, df):\n    v = demo.is_violation(df)\n    z4 = df["zone"] == "Z4"\n    print(f"{label}：{len(df)} 列；平均信心度 {df[\'confidence\'].mean():.3f}；Z4 平均 {df.loc[z4, \'confidence\'].mean():.3f}；"\n          f"違規 {int(v.sum())}；Z4 違規 {int((v & z4).sum())}；Z4 no_harness {int((z4 & (df[\'event_type\'] == \'no_harness\')).sum())}")\n\n\nif __name__ == "__main__":\n    events, log, dropped = demo.clean(demo.load_events())      # 已去重、cam-02 已 ÷100\n    report("原始", events)\n\n    a = events.copy()\n    a["confidence"] = a["confidence"].fillna(0)                 # A：補 0\n    report("A 補 0", a)\n\n    # TODO：B = events.dropna(subset=["confidence"])，再 report("B dropna", b)\n'

@@ -1,4 +1,4 @@
-"""教師用：產生本課的合成「工地 AI 攝影機事件」練習資料（第 01、05–08、10–15、17–18 節共用）。
+"""教師用：產生本課的合成「工地 AI 攝影機事件」練習資料（第 01、06–09、11–16、18–19 節共用）。
 
 只用 Python 標準函式庫；固定亂數種子，**同一版 Python 每次產生的位元組完全相同**（已於 3.10／3.11 比對）。
 全部為合成資料：人名、電話、事件都是虛構的，不對應任何真實工地或人員。
@@ -8,7 +8,7 @@
   workers.csv           人員名冊（含沒有任何事件的人，以及一位中途換承攬商、出現兩列的人）
   event-types.csv       事件類型對照：中文名稱、是否違規、對應法條（pcode＋slug，可接 articles.jsonl）
   dashboard-export.csv  廠商儀表板匯出的同一批事件（第 1 週）：中文欄名、百分比字串、斜線日期
-  near-miss-reports.jsonl  主管填寫的虛驚事件通報（自由文字，含人名與電話；第 17 節去識別練習）
+  near-miss-reports.jsonl  主管填寫的虛驚事件通報（自由文字，含人名與電話；第 18 節去識別練習）
   MANIFEST.json         產物雜湊與刻意埋入的狀況清單
 
 刻意埋入、講義會用到的狀況（全部記在 MANIFEST 的 "planted"）：
@@ -87,11 +87,11 @@ def build_workers(rng: random.Random) -> list[dict]:
         rows.append({"worker_id": f"W{i:03d}", "name": name, "contractor": contractor,
                      "trade": TRADES[zone], "home_zone": zone,
                      "valid_from": "2026-08-31", "valid_to": ""})
-    # W023 在 09-14 從甲營造轉到丙土木：名冊有兩列（第 14 節 fan-out）
+    # W023 在 09-14 從甲營造轉到丙土木：名冊有兩列（第 15 節 fan-out）
     w23 = next(r for r in rows if r["worker_id"] == "W023")
     w23["valid_to"] = "2026-09-13"
     rows.insert(rows.index(w23) + 1, dict(w23, contractor="丙土木", valid_from="2026-09-14", valid_to=""))
-    # W041 是施工架工（第 08 節的真實異常）
+    # W041 是施工架工（第 09 節的真實異常）
     w41 = next(r for r in rows if r["worker_id"] == "W041")
     w41.update(contractor="乙鋼構", trade=TRADES["Z4"], home_zone="Z4")
     return rows
@@ -105,7 +105,7 @@ def build_events(rng: random.Random, workers: list[dict]) -> tuple[list[dict], d
     absent_all = set(ids[-8:])                        # W053–W060：新進／內勤，整段期間沒有任何事件
     propensity = {wid: 1.0 for wid in ids}
     for wid in ("W007", "W018", "W029", "W041", "W044"):
-        propensity[wid] = 3.5                         # 屢次違規者（第 07、12、13 節）
+        propensity[wid] = 3.5                         # 屢次違規者（第 08、13、14 節）
     rows, seq = [], {}
 
     def emit(cam, zone, wid, etype, t_event, delay_s, *, model="ppe-v3", conf=None):

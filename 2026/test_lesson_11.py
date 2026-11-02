@@ -1,18 +1,16 @@
 import sys
-import warnings
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_lessons import ROOT, load_demo, run_main, pasted_blocks  # noqa: E402
 import pandas as pd, pytest  # noqa: E402
 
-LESSON = "11-datetime-resample.md"
-PANDAS2 = int(pd.__version__.split(".")[0]) < 3
-PANDAS2_DIFFS = [("沒有報錯：dtype=object，.dt 不能用；警告 ['FutureWarning']", "ValueError: Mixed timezones detected")]
+LESSON = "11-event-vs-ingest.md"
+PANDAS2_DIFFS = []  # pandas 2.3.3 標準輸出逐字相同
 
 
 def test_11_output_matches_lesson():
     out = run_main(LESSON)
-    if PANDAS2:
+    if int(pd.__version__.split(".")[0]) < 3:
         for old, new in PANDAS2_DIFFS:
             out = out.replace(old, new)
     blocks = [b for b in pasted_blocks(LESSON) if b.startswith("== ")]
@@ -27,153 +25,124 @@ def d11():
 
 
 @pytest.fixture(scope="module")
-def events(d11):
+def raw(d11):
     return d11["load_events"]()
 
 
 @pytest.fixture(scope="module")
-def workdays():
-    days = pd.date_range("2026-08-31", "2026-09-26", freq="D", tz="Asia/Taipei")
-    return days[days.dayofweek != 6]
+def events(d11, raw):
+    return d11["dedupe"](raw)
 
 
-def test_11_mixed_timezones_by_version():
-    mixed = pd.Series(["2026-08-31T07:04:37+08:00", "2026-08-30T23:04:45+00:00"])
-    if PANDAS2:
-        with pytest.warns(FutureWarning, match="mixed time zones"):
-            out = pd.to_datetime(mixed, format="ISO8601")
-        assert out.dtype == object
-        with pytest.raises(AttributeError, match="Can only use .dt accessor"):
-            out.dt.hour
-    else:
-        with pytest.raises(ValueError, match="Mixed timezones detected"):
-            pd.to_datetime(mixed, format="ISO8601")
-    fixed = pd.to_datetime(mixed, format="ISO8601", utc=True).dt.tz_convert("Asia/Taipei")
-    assert fixed.dt.strftime("%H:%M:%S").tolist() == ["07:04:37", "07:04:45"]
+def test_11_times_are_tz_aware_taipei(raw):
+    for col in ("event_ts", "ingest_ts"):
+        assert str(raw[col].dt.tz) == "Asia/Taipei"
+    # 同一刻：event_time 字串的本地時刻 = 轉換後的時刻
+    assert (raw["event_ts"].dt.strftime("%Y-%m-%dT%H:%M:%S+08:00") == raw["event_time"]).all()
 
 
-def test_11_dashboard_localized_matches_events(d11, events):
-    dash = d11["load_dashboard"]()
-    assert str(dash["ts"].dt.tz) == "Asia/Taipei" and len(dash) == 692
-    ref = events.set_index("event_id").loc[dash["事件編號"], "ts"].dt.floor("min").reset_index(drop=True)
-    assert dash["ts"].reset_index(drop=True).equals(ref)
-    wrong = pd.to_datetime(dash["發生時間"], format=d11["DASH_FORMAT"], utc=True)
-    assert ((wrong - dash["ts"]) == pd.Timedelta(hours=8)).all()       # 靜默 8 小時
-    w = wrong.dt.tz_convert("Asia/Taipei")
-    assert (w.dt.date != dash["ts"].dt.date).sum() == 65 and (w.dt.dayofweek == 6).sum() == 11
+def test_11_dedupe_keeps_first_arrival_and_is_idempotent(d11, raw, events):
+    assert len(events) == 2818 and events["event_id"].is_unique
+    twice = raw[raw["event_id"].duplicated(keep=False)]
+    first = twice.groupby("event_id")["ingest_ts"].min()
+    assert (events.set_index("event_id").loc[first.index, "ingest_ts"] == first).all()
+    # 列的順序打亂、重跑一次，結果一樣
+    again = d11["dedupe"](raw.sample(frac=1, random_state=1))
+    assert again.sort_values("event_id")["ingested_at"].tolist() == events.sort_values("event_id")["ingested_at"].tolist()
+    assert d11["dedupe"](events).equals(events)
 
 
-def test_11_require_aware_errors(d11, events):
-    with pytest.raises(ValueError, match="沒有時區"):
-        d11["daily_zone"](events.assign(ts=events["ts"].dt.tz_localize(None)))
-    with pytest.raises(TypeError, match="不是 datetime"):
-        d11["weekly"](events.assign(ts=events["event_time"]))
-    with pytest.raises(ValueError, match="start 只能是"):
-        d11["weekly"](events, "TUE")
-    with pytest.raises(TypeError, match="Already tz-aware"):
-        events["ts"].dt.tz_localize("Asia/Taipei")
+def test_11_daily_difference_is_exactly_the_late_batch(d11, events):
+    e, i = d11["daily"](events, "event"), d11["daily"](events, "ingest")
+    diff = (i - e).fillna(0)
+    assert diff[diff != 0].to_dict() == {"2026-09-10": -20, "2026-09-11": 20}
+    assert e.sum() == i.sum() == 2818
+    moved = events[events["event_ts"].dt.date != events["ingest_ts"].dt.date]
+    assert len(moved) == 20 and moved["event_id"].str.startswith("cam-05-20260910-").all()
+    assert moved["event_type"].value_counts().to_dict() == {"ppe_ok": 18, "restricted_entry": 2}
+    assert len(e) == 24  # 24 個施工日，沒有週日
 
 
-def test_11_format_and_coerce():
-    s = pd.Series(["2026/08/31 07:04", "2026-08-31 07:20", "N/A"])
-    with pytest.raises(ValueError, match="doesn't match format"):
-        pd.to_datetime(s, format="%Y/%m/%d %H:%M")
-    assert pd.to_datetime(s, format="%Y/%m/%d %H:%M", errors="coerce").isna().sum() == 2
+def test_11_without_dedupe_counts_are_inflated(d11, raw):
+    assert d11["daily"](raw, "event")["2026-09-10"] == 137
+    assert d11["daily"](raw, "ingest")["2026-09-11"] == 151
 
 
-def test_11_errors_ignore_by_version():
-    s = pd.Series(["2026/08/31 07:04"])
-    if PANDAS2:
-        with pytest.warns(FutureWarning, match="errors='ignore' is deprecated"):
-            pd.to_datetime(s, errors="ignore")
-    else:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            with pytest.raises(AssertionError):
-                pd.to_datetime(s, errors="ignore")
+def test_11_as_of(d11, events):
+    f = d11["as_of"]
+    assert f(events, "2026-09-10", "2026-09-10T23:59:59+08:00") == 97
+    assert f(events, "2026-09-10", "2026-09-11T09:05:00+08:00") == 97
+    assert f(events, "2026-09-10", "2026-09-11T09:06:00+08:00") == 117
+    assert f(events, "2026-09-10", "2026-09-11T01:06:00+00:00") == 117   # 同一刻、UTC 寫法
+    with pytest.raises(ValueError, match="cutoff 要帶時區"):
+        f(events, "2026-09-10", "2026-09-11 12:00:00")
 
 
-def test_11_daily_zone_fills_zero(d11, events, workdays):
-    t = d11["daily_zone"](events, workdays)
-    assert t.shape == (24, 4)
-    assert t.sum().to_dict() == {"Z1": 114, "Z2": 152, "Z3": 116, "Z4": 114}
-    assert t.loc["2026-09-01", "Z4"] == 0 and t.loc["2026-09-22", "Z4"] == 20
-    assert t.index.tz is not None and (t.index.dayofweek != 6).all()
-    assert round(t["Z4"].mean(), 2) == 4.75
-    # 不給 workdays 的 groupby 版：09-01 Z4 不存在
-    v = events[events["event_type"] != "ppe_ok"]
-    cells = v.groupby([v["ts"].dt.floor("D"), "zone"]).size()
-    assert len(cells) == 95 and round(cells.xs("Z4", level="zone").mean(), 2) == 4.96
+def test_11_utc_date_trap(events):
+    utc = events.groupby(events["ingested_at"].str[:10]).size()
+    local = events.groupby(events["event_ts"].dt.strftime("%Y-%m-%d")).size()
+    t = pd.concat([local, utc], axis=1).fillna(0)
+    assert len(t) == 28 and (t.iloc[:, 0] != t.iloc[:, 1]).sum() == 24
+    wrong = events[events["ingested_at"].str[:10] != events["event_ts"].dt.strftime("%Y-%m-%d")]
+    assert len(wrong) == 230 and (wrong["event_ts"].dt.hour == 7).sum() == 210
+    assert utc[[d for d in utc.index if pd.Timestamp(d).dayofweek == 6]].sum() == 31
 
 
-def test_11_grouper_vs_resample(events):
-    by_res = events.set_index("ts").resample("D").size()
-    assert len(by_res) == 27 and (by_res == 0).sum() == 3
-    assert len(events.groupby(pd.Grouper(key="ts", freq="D")).size()) == 27
-    two = events.groupby([pd.Grouper(key="ts", freq="D"), "zone"]).size()
-    assert two.index.get_level_values(0).nunique() == 24 and (two == 0).sum() == 0
-    assert len(events.groupby(events["ts"].dt.date).size()) == 24
+def test_11_naive_ai_daily_counts():
+    """〈參考判讀〉：預設 read_json、不去重、groupby(ingested_at.dt.date)。"""
+    import datetime as dt
+    x = pd.read_json(ROOT / "data" / "events" / "events.jsonl", lines=True)
+    n = x.groupby(x["ingested_at"].dt.date).size()
+    assert (n[dt.date(2026, 9, 10)], n[dt.date(2026, 9, 11)], len(n)) == (95, 154, 28)
+    assert x.groupby(x["event_time"].dt.date).size()[dt.date(2026, 9, 10)] == 137
 
 
-def test_11_week_anchor(d11, events):
-    v = events[events["event_type"] != "ppe_ok"]
-    mon = d11["weekly"](v, "MON")
-    assert mon.index.dayofweek.tolist() == [0, 0, 0, 0]
-    assert mon.index.strftime("%m-%d").tolist() == ["08-31", "09-07", "09-14", "09-21"]
-    assert mon.tolist() == [117, 116, 140, 123]
-    assert d11["weekly"](v, "SUN").index.dayofweek.tolist() == [6, 6, 6, 6]
-    naive = v.set_index("ts").resample("W-MON").size()
-    assert naive.tolist() == [23, 117, 120, 135, 101]
-    # 週表依區域（〈參考判讀〉）
-    t = d11["daily_zone"](events)
-    wk = t.resample("W-MON", label="left", closed="left").sum()
-    assert wk.values.tolist() == [[26, 32, 38, 21], [29, 36, 26, 25], [35, 49, 30, 26], [24, 35, 22, 42]]
-    assert t.resample("W-MON").sum().iloc[0].tolist() == [8, 6, 6, 3]
+def test_11_load_rejects_naive_time(d11, tmp_path):
+    lines = (ROOT / "data" / "events" / "events.jsonl").read_text(encoding="utf-8").splitlines()[:5]
+    lines[2] = lines[2].replace("+00:00", "")
+    bad = tmp_path / "e.jsonl"
+    bad.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="ingested_at 有沒帶時區"):
+        d11["load_events"](bad)
 
 
-def test_11_daily_zone_reindex_adds_missing_day(d11, events, workdays):
-    """某一天整天沒有違規（例如停電）：groupby 不會產生那一列，reindex 要補成 0。"""
-    no_0903 = events[events["ts"].dt.strftime("%m-%d") != "09-03"]
-    assert len(d11["daily_zone"](no_0903)) == 23
-    t = d11["daily_zone"](no_0903, workdays)
-    assert len(t) == 24 and t.loc["2026-09-03"].tolist() == [0, 0, 0, 0]
-    assert t.notna().all().all()
+def test_11_modified_vs_fetched(d11):
+    laws = d11["read_modified_dates"]()
+    assert dict(zip(laws["pcode"], laws["modified_date"])) == {
+        "N0020007": "20210428", "N0030001": "20240731", "N0020012": "20150701"}
+    a = pd.read_json(ROOT / "data" / "articles.jsonl", lines=True, dtype=False, convert_dates=False)
+    assert a["fetched_at"].unique().tolist() == ["2026-10-05T04:05:23+00:00"]
 
 
-def _run_main_on(tmp_path, dash_rows=None, drop_day=None):
-    """把 Demo 指到暫存資料夾（截短的儀表板／拿掉一天的事件），確認印出的數字跟著資料變，不是寫死的。"""
-    import io
-    from contextlib import redirect_stdout
-    src = ROOT / "data" / "events"
-    dst = tmp_path / "data" / "events"
-    dst.mkdir(parents=True)
-    dash = (src / "dashboard-export.csv").read_text(encoding="utf-8-sig").splitlines()
-    if dash_rows is not None:
-        dash = dash[:dash_rows + 1]
-    (dst / "dashboard-export.csv").write_text("\n".join(dash) + "\n", encoding="utf-8-sig")
-    lines = (src / "events.jsonl").read_text(encoding="utf-8").splitlines()
-    if drop_day is not None:
-        lines = [ln for ln in lines if f'"event_time": "{drop_day}T' not in ln]
-    (dst / "events.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    name, source, _ = load_demo(LESSON)
-    out = io.StringIO()
-    with redirect_stdout(out), warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        exec(compile(source, name, "exec"), {"__name__": "__main__", "__file__": str(tmp_path / name)})
-    return out.getvalue()
-
-
-def test_11_counts_in_output_follow_data(tmp_path):
-    out = _run_main_on(tmp_path, dash_rows=200, drop_day="2026-09-17")
-    assert "localize 版 200 筆全部相同：True" in out
-    assert "692" not in out
-    # 少了一個施工日：23 天 × 4 區，不是寫死的「24 天 × 4 區 = 96」
-    assert "違規 日×區 的 groupby：91 格（23 天 × 4 區 = 92）" in out
-
-
-def test_11_mixed_rows_prose_matches_output():
-    """正文說「第 2、3 列」是 UTC 的 23:04、23:12，要對得上 Demo 印出的索引。"""
+def test_11_longest_delay_is_first_arrival(raw, events):
+    """最長延遲要在每個 event_id 的第一次到達上找；未去重的 idxmax 會落在重送的第二份（23:08:24）。"""
+    raw_delay = raw["ingest_ts"] - raw["event_ts"]
+    assert raw_delay.max() == pd.Timedelta("23:08:24")
+    assert raw["event_id"].duplicated()[raw_delay.idxmax()]          # 天真寫法找到的是重送列
+    d = events["ingest_ts"] - events["event_ts"]
+    assert d.max() == pd.Timedelta("22:54:24")
+    assert events.loc[d.idxmax(), "event_id"] == "cam-05-20260910-0002"
     out = run_main(LESSON)
-    assert "2    2026-08-30T23:04:45+00:00\n3    2026-08-30T23:12:51+00:00" in out
-    text = (ROOT / LESSON).read_text(encoding="utf-8")
-    assert "第 2、3 列（UTC 的 23:04、23:12）" in text and "第 2、4 列" not in text
+    assert "最長延遲（第一次到達）：0 days 22:54:24，cam-05-20260910-0002" in out
+    assert "23:08:24" not in out
+    # 印出的四列裡，最長延遲那一列在第三列，且是同一 event_id 的第一次到達
+    sec = out.split("== 2.")[0].rstrip().splitlines()
+    assert sec[-2].split()[1] == "cam-05-20260910-0002" and "01:05:29" in sec[-2]
+
+
+def test_11_late_rows_are_resent_and_backward_rows_split(raw):
+    delay = raw["ingest_ts"] - raw["event_ts"]
+    late = delay > pd.Timedelta("1min")
+    assert late.sum() == 40 and raw.loc[late, "event_id"].nunique() == 20
+    back = raw["event_ts"] < raw["event_ts"].shift()
+    assert (back.sum(), (back & late).sum(), (back & ~late).sum()) == (45, 20, 25)
+    assert (back & ~late & (raw["camera_id"] == "cam-05")).sum() == 5
+
+
+def test_11_seven_oclock_rows_not_all_shifted(events):
+    h7 = events["event_ts"].dt.hour == 7
+    wrong = events["ingested_at"].str[:10] != events["event_ts"].dt.strftime("%Y-%m-%d")
+    assert h7.sum() == 211 and (h7 & wrong).sum() == 210
+    assert events.loc[h7 & ~wrong, "event_time"].tolist() == ["2026-09-16T07:59:56+08:00"]
+    out = run_main(LESSON)
+    assert "07:xx 發生的共 211 列，沒換日的：['2026-09-16T07:59:56+08:00']" in out

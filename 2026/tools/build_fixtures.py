@@ -5,11 +5,11 @@
 來源：4-learn/crawler-playground（MIT），固定 commit，下載後驗證 SHA-256。
 產物：
   data/articles.jsonl      749 條，欄位比照爬蟲課第 16 節〈交給下游〉，含四個來源欄位
-  data/02-exports/*.csv    三份「不同人、不同軟體匯出」的 CSV，給第 02 節練習讀檔
-  data/03-api/N0020012/    練習站 v1 API 的兩頁原始 JSON（巢狀、分頁），與線上位元組相同，給第 03 節
-  data/03-crawl/N0020012.jsonl  爬蟲課第 05／14 節那種「一部法規一個檔」的交付，給第 03 節
-  data/09-batches/v2-changes.jsonl  練習站第 2 版的增量交付（修改 4、新增 1），給第 09 節
-  data/09-batches/v2-laws.json      練習站 v2 API 的法規總覽（含各法條文數），與線上位元組相同，給第 09 節
+  data/03-exports/*.csv    三份「不同人、不同軟體匯出」的 CSV，給第 03 節練習讀檔
+  data/04-api/N0020012/    練習站 v1 API 的兩頁原始 JSON（巢狀、分頁），與線上位元組相同，給第 04 節
+  data/04-crawl/N0020012.jsonl  爬蟲課第 05／14 節那種「一部法規一個檔」的交付，給第 04 節
+  data/10-batches/v2-changes.jsonl  練習站第 2 版的增量交付（修改 4、新增 1），給第 10 節
+  data/10-batches/v2-laws.json      練習站 v2 API 的法規總覽（含各法條文數），與線上位元組相同，給第 10 節
   data/MANIFEST.json       產物雜湊、來源 commit 與產生環境
 
 同一份來源每次產生的檔案位元組完全相同，講義裡貼的輸出不會因重建而改變。
@@ -36,7 +36,7 @@ SITE = "https://4-learn.github.io/crawler-playground"
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 
-# 第 02 節的三份匯出：刻意對應真實辦公室會遇到的三種情況。
+# 第 03 節的三份匯出：刻意對應真實辦公室會遇到的三種情況。
 #   - 勞動基準法：Excel 存的「CSV UTF-8」，帶 BOM；slug 有 9-1 這種條次
 #   - 大量解僱勞工保護法：工程師用程式匯出，UTF-8 無 BOM；slug 全是數字
 #   - 勞資爭議處理法：舊系統匯出，Big5（cp950）
@@ -45,11 +45,11 @@ EXPORTS = [
     ("mass-layoff.csv", "N0020012", "utf-8"),
     ("labor-disputes.csv", "N0020007", "cp950"),
 ]
-# 第 03 節：選一部會分頁的小法規（21 條 → 20＋1），API 結構照抄練習站 build.py 的 build_v1_api()
+# 第 04 節：選一部會分頁的小法規（21 條 → 20＋1），API 結構照抄練習站 build.py 的 build_v1_api()
 API_PCODE = "N0020012"
 API_PAGE_SIZE = 20
 
-# 第 09 節：練習站第 2 版的刻意變動，照抄 crawler-playground build.py 的 V2_MODIFY／V2_DELETE／V2_ADD
+# 第 10 節：練習站第 2 版的刻意變動，照抄 crawler-playground build.py 的 V2_MODIFY／V2_DELETE／V2_ADD
 V2_MODIFY = [("N0030001", "24"), ("N0030001", "38"), ("N0060001", "6"), ("N0030014", "15")]
 V2_DELETE = [("N0020012", "21")]
 V2_FAKE_SENTENCE = "（本句為爬蟲練習站第 2 版虛構修正，用於練習變動偵測，非真實法條。）"
@@ -116,12 +116,12 @@ def build_api_pages(src: dict, pcode: str) -> dict[str, bytes]:
             "next": f"page-{n + 1}.json" if n < len(chunks) else None,
             "articles": [{k: a[k] for k in ("slug", "article_no", "chapter", "section", "content")} for a in chunk],
         }
-        pages[f"03-api/{pcode}/page-{n}.json"] = (json.dumps(obj, ensure_ascii=False, indent=1) + "\n").encode("utf-8")
+        pages[f"04-api/{pcode}/page-{n}.json"] = (json.dumps(obj, ensure_ascii=False, indent=1) + "\n").encode("utf-8")
     return pages
 
 
 def build_v2_changes(src: dict) -> bytes:
-    """增量交付：只含 v2 修改與新增的條文。刪除不會出現在增量檔裡——這正是第 09 節要討論的。"""
+    """增量交付：只含 v2 修改與新增的條文。刪除不會出現在增量檔裡——這正是第 10 節要討論的。"""
     laws = {law["pcode"]: law for law in src["laws"]}
     rows = []
     for pcode, slug in V2_MODIFY:
@@ -169,11 +169,11 @@ def main() -> None:
     src, _ = load_source(args.source)
     outputs = {"articles.jsonl": build_articles(src)}
     for name, pcode, enc in EXPORTS:
-        outputs[f"02-exports/{name}"] = build_export(src, pcode, enc)
+        outputs[f"03-exports/{name}"] = build_export(src, pcode, enc)
     outputs.update(build_api_pages(src, API_PCODE))
-    outputs[f"03-crawl/{API_PCODE}.jsonl"] = build_articles(src, only=API_PCODE)
-    outputs["09-batches/v2-changes.jsonl"] = build_v2_changes(src)
-    outputs["09-batches/v2-laws.json"] = build_v2_summary(src)
+    outputs[f"04-crawl/{API_PCODE}.jsonl"] = build_articles(src, only=API_PCODE)
+    outputs["10-batches/v2-changes.jsonl"] = build_v2_changes(src)
+    outputs["10-batches/v2-laws.json"] = build_v2_summary(src)
 
     for rel, data in outputs.items():
         (DATA / rel).parent.mkdir(parents=True, exist_ok=True)
@@ -185,8 +185,8 @@ def main() -> None:
                    "url": SOURCE_URL, "sha256": SOURCE_SHA256,
                    "upstream": src["source"]["name"], "upstream_update_date": src["source"]["api_update_date"]},
         "caveat": "條文取自練習站，可能經刻意修改以供練習，不具法律效力。fetched_at 為練習站抓取官方 API 的時間，不是學生爬取時間。"
-                  f"09-batches 的 fetched_at（{V2_FETCHED_AT}）是模擬的第二次交付時間；內容依練習站 build.py 的 V2_MODIFY／V2_ADD 產生。",
-        "exports": [{"file": f"02-exports/{n}", "pcode": p, "encoding": e} for n, p, e in EXPORTS],
+                  f"10-batches 的 fetched_at（{V2_FETCHED_AT}）是模擬的第二次交付時間；內容依練習站 build.py 的 V2_MODIFY／V2_ADD 產生。",
+        "exports": [{"file": f"03-exports/{n}", "pcode": p, "encoding": e} for n, p, e in EXPORTS],
         "files": {rel: {"bytes": len(d), "sha256": sha256(d)} for rel, d in sorted(outputs.items())},
         "environment": {"python": platform.python_version(), "generator": "tools/build_fixtures.py"},
     }

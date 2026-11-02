@@ -1,0 +1,8 @@
+LESSON = '12-datetime-resample.md'
+TITLE = '每日 × 區域、週彙總'
+STARTER = '12_workshop_daily_zone.py'
+CLASS = '執行起手式，確認 `ts` 的型別帶時區、表是 24 天 × 4 區、09-01 的 Z4 是 0。對照第五段：`groupby` 只產生 95 格，09-01 的 Z4 那一格不存在。這張表的 0 是哪一行程式補出來的？'
+CLASS_ANSWER = '`daily_zone()` 裡的 `unstack("zone", fill_value=0)`：攤成「日 × 區」時把不存在的格子補 0；`reindex(workdays, fill_value=0)` 則補上一整天都沒有違規的日子。'
+EXTENSION = '\n\n1. 把每日 × 區域表彙總成「週一開始」的週表（4 列 × 4 欄），標籤用週一的日期；再用 `resample("W-MON")`（不加參數）做一次，比較兩者。\n2. 請 OpenCode「讀 `dashboard-export.csv`，轉成 UTC 時間，做每日事件數」，驗收：它有沒有用 `utc=True` 直接轉沒有時區的字串？換回台北後小時有沒有出現 0 點或 17 點以後？每日計數有沒有週日？'
+ACCEPT = '- `ts` 的時區是 `Asia/Taipei`，表 24 × 4，09-01 的 Z4 是 0。\n- 說得出「缺列」和「0」的差別。\n- （延伸）4 列週表，並寫一句話說明週的起點與標籤。'
+STARTER_CODE = '"""第 12 節 Workshop 課堂題：施工日 × 區域的違規數表（沒有違規的格子是 0）。"""\n\nfrom importlib import import_module\n\ndemo = import_module("12_datetime_resample")   # 檔名以數字開頭，改用 import_module 匯入\n\nif __name__ == "__main__":\n    events = demo.load_events()\n    print(f"ts 的型別：{events[\'ts\'].dtype}")\n    days = events.set_index("ts").resample("D").size().index\n    workdays = days[days.dayofweek != 6]                       # 週日停工\n    table = demo.daily_zone(events, workdays)\n    print(f"{table.shape[0]} 天 × {table.shape[1]} 區；09-01 的 Z4：{table.loc[\'2026-09-01\', \'Z4\']}")\n    print(table.sum().to_string())\n'

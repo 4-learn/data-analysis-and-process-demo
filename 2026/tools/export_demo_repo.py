@@ -4,7 +4,7 @@
 
 講義是唯一原稿：Demo 程式碼從 `<!-- demo: 檔名 -->` 區塊逐字取出，不另外維護一份。
 匯出內容：每節一支 `NN_xxx.py`、`data/`（含 MANIFEST）、`tools/`（資料產生器）、
-`test_lessons.py` 與各節 `test_lesson_NN.py`（測試會從同目錄的講義 .md 擷取 Demo，
+`test_lessons.py`、`test_fn_tables.py` 與各節 `test_lesson_NN.py`（測試會從同目錄的講義 .md 擷取 Demo，
 所以講義原稿 `NN-*.md` 也一併放在同一層）。匯出後在目標資料夾跑 pytest 必須全過。
 """
 
@@ -14,9 +14,10 @@ import sys
 from pathlib import Path
 
 SRC = Path(__file__).resolve().parent.parent
+WORKSHOP = re.compile(r"<!-- workshop: ([\w.]+) -->\n```python\n(.*?)\n```", re.S)
 DEMO = re.compile(r"<!-- demo: ([\w.]+) -->\n```python\n(.*?)\n```", re.S)
 
-README = """# 2026 改版：資料處理與分析（pandas 3）
+README = """# 資料處理與分析（pandas 3）
 
 勞動部 AI 大數據人才養成班「Python 資料處理與分析（2026 改版）」的上課示範程式與練習資料。
 本資料夾與上層舊版（`numpy/`、`pandas/`、`plot/`、`workshop/`）互不相干；舊版內容保留不動。
@@ -32,7 +33,7 @@ cd 2026
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python3 01_position.py          # 每支都可以直接執行，只讀 data/、不寫檔、不連網
+python3 01_position.py          # 每支都可以直接執行，不連網；只有 02_pandas_intro.py 會寫 output/
 python3 -m pytest -q            # 驗證：講義貼的輸出與實際執行結果逐字相同
 ```
 
@@ -40,19 +41,20 @@ python3 -m pytest -q            # 驗證：講義貼的輸出與實際執行結�
 
 ## 目錄
 
-| 檔案 | 節次 | 主題 |
-|---|---|---|
+| 檔案 | 節次 | 主題 | Workshop 起手式 |
+|---|---|---|---|
 {rows}
 
 ## 練習資料：`data/`
 
-- `articles.jsonl`、`02-exports/`、`03-*`、`09-batches/`：來自爬蟲課練習站 [crawler-playground](https://github.com/4-learn/crawler-playground)（MIT）固定 commit，由 `tools/build_fixtures.py` 產生。條文**可能經刻意修改，不具法律效力**。
+- `articles.jsonl`、`03-exports/`、`04-api/`、`04-crawl/`、`10-batches/`、`17-tokenizer/`：來自爬蟲課練習站 [crawler-playground](https://github.com/4-learn/crawler-playground)（MIT）固定 commit，由 `tools/build_fixtures.py` 產生。條文**可能經刻意修改，不具法律效力**。
 - `events/`：**合成**的工地 AI 攝影機事件、人員名冊、虛驚通報，由 `tools/build_events.py` 以固定種子產生。**人名、電話、工號、事件全部虛構**，不代表任何真實工地。
 - 每個檔案的位元組數與 SHA-256 記在 `MANIFEST.json`；重建結果位元組相同。
 
 ## 給老師
 
-`NN-*.md` 是講義原稿（與 HackMD 同內容），測試從這裡擷取 Demo 並比對貼上的輸出；`.py` 由 `tools/export_demo_repo.py` 從講義逐字取出，請改講義、再重新匯出，不要直接改 `.py`。
+`NN-*.md` 是講義原稿，測試從這裡擷取 Demo 並比對貼上的輸出；`.py`（含 Workshop 起手式）由 `tools/export_demo_repo.py` 從講義逐字取出，請改講義、再重新匯出，不要直接改 `.py`。
+講義正本在上層 `docs/`（HackMD 與它同步）；`docs/N.md` 對應第 N 節。
 """
 
 
@@ -67,17 +69,21 @@ def main() -> None:
         text = md.read_text(encoding="utf-8")
         (name, code), = DEMO.findall(text)
         (out / name).write_text(code + "\n", encoding="utf-8")
+        for wname, wcode in WORKSHOP.findall(text):          # Workshop 起手式：學生直接執行、複製來改
+            (out / wname).write_text(wcode + "\n", encoding="utf-8")
         shutil.copy(md, out / md.name)
         title = text.splitlines()[0].lstrip("# ").split("｜", 1)[1]
-        rows.append(f"| `{name}` | {md.name[:2]} | {title} |")
+        starters = "、".join(f"`{w}`" for w, _ in WORKSHOP.findall(text)) or "—"
+        rows.append(f"| `{name}` | {md.name[:2]} | {title} | {starters} |")
     shutil.copytree(SRC / "data", out / "data", symlinks=True)
     if any(p.is_symlink() for p in (out / "data").rglob("*")):
         raise SystemExit("data/ 裡有 symlink，請先清掉")
     shutil.copytree(SRC / "tools", out / "tools", ignore=shutil.ignore_patterns("__pycache__"))
-    for t in sorted(SRC.glob("test_lesson*.py")):
+    for t in sorted(SRC.glob("test_*.py")):
         shutil.copy(t, out / t.name)
     (out / "requirements.txt").write_text(
         "pandas==3.0.6\nnumpy==2.4.6\ntabulate==0.10.0\nopenpyxl==3.1.5\npytest==9.1.1\n", encoding="utf-8")
+    (out / ".gitignore").write_text("output/\n", encoding="utf-8")   # 02_pandas_intro.py 寫的檔不進版控
     (out / "README.md").write_text(README.format(book=book, rows="\n".join(rows)), encoding="utf-8")
     print(f"exported {len(rows)} demos to {out}")
 

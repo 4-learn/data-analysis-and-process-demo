@@ -1,14 +1,11 @@
 import sys
-import io
-import json
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_lessons import ROOT, load_demo, run_main, pasted_blocks  # noqa: E402
 import pandas as pd, pytest  # noqa: E402
 
-LESSON = "18-end-to-end.md"
-PANDAS2_DIFFS = []  # 2.3.3 實測逐字相同（dtype 字串差異 Demo 已避開）
-FINGERPRINT = "deea741b228d613d"
+LESSON = "18-text-corpus.md"
+PANDAS2_DIFFS = []  # 2.3.3 實測逐字相同
 
 
 def test_18_output_matches_lesson():
@@ -17,7 +14,7 @@ def test_18_output_matches_lesson():
         for old, new in PANDAS2_DIFFS:
             out = out.replace(old, new)
     blocks = [b for b in pasted_blocks(LESSON) if b.startswith("== ")]
-    assert len(blocks) == 6
+    assert blocks
     for b in blocks:
         assert b in out, b[:300]
 
@@ -28,120 +25,144 @@ def d18():
 
 
 @pytest.fixture(scope="module")
-def lines(d18):
-    return (d18["DATA"] / "events.jsonl").read_text(encoding="utf-8").splitlines()
+def articles(d18):
+    return d18["read_articles"]()
 
 
-def test_18_fingerprint_stable_and_order_free(d18, lines):
-    path = d18["DATA"] / "events.jsonl"
-    fp = d18["fingerprint"]
-    assert fp(d18["run"](path)[0]) == FINGERPRINT
-    assert fp(d18["run"](io.StringIO("\n".join(reversed(lines)) + "\n"))[0]) == FINGERPRINT
-    # 換成同一時刻的 UTC 寫法：意義相同，指紋不變
-    assert fp(d18["run"](d18["broken"](lines, 5, event_time="2026-08-30T23:54:26Z"))[0]) == FINGERPRINT
+@pytest.fixture(scope="module")
+def reports(d18):
+    return pd.read_json(d18["DATA"] / "events" / "near-miss-reports.jsonl", lines=True, dtype=False, convert_dates=False)
 
 
-def test_18_summary_contract(d18):
-    text, tokens, table, audit = d18["run"](d18["DATA"] / "events.jsonl")
-    assert "\\u" not in text and tokens == 640 and tokens <= d18["BUDGET"]
-    rows = [json.loads(x) for x in text.splitlines()]
-    assert [r["kind"] for r in rows] == ["top_worker"] * 3 + ["unidentified", "trend", "anomaly", "data_note", "data_note"]
-    assert [r["item"] for r in rows[:3]] == ["W041", "W029", "W044"]
-    # 每一列的 key 都能追回 n 筆
-    known, violation = d18["read_event_types"]()
-    ev, _ = d18["clean"](d18["read_events"](d18["DATA"] / "events.jsonl"))
-    ev = d18["validate"](ev, known, violation)
-    for r in rows:
-        assert len(ev.query(r["key"])) == r["n"] > 0
-    assert table["violations"].sum() == ev["is_violation"].sum() == 496
-    assert [(a["step"], a["rows"], a["cameras"]) for a in audit] == [("去重", 20, ["cam-05"]), ("修正", 69, ["cam-02"])]
+@pytest.fixture(scope="module")
+def roster(d18):
+    return pd.read_csv(d18["DATA"] / "events" / "workers.csv", dtype=str, keep_default_na=False)
 
 
-def test_18_weekly_table(d18):
-    table = d18["run"](d18["DATA"] / "events.jsonl")[2]
-    assert len(table) == 212 and table["who"].nunique() == 53
-    w41 = table[table["who"] == "W041"].set_index("week")["max_per_day"]
-    assert w41.to_dict() == {"2026-08-31": 1, "2026-09-07": 2, "2026-09-14": 2, "2026-09-21": 18}
-    unk = table[table["who"] == "(未辨識)"]
-    assert unk["violations"].sum() == 77 and unk["max_per_day"].max() == 7
+def test_18_chunks_roundtrip_and_respect_size(d18, articles):
+    for size in (300, 450, 500):
+        chunks = d18["chunk_articles"](articles, size)
+        assert chunks["chunk_id"].is_unique
+        rebuilt = chunks.groupby(["pcode", "slug"], sort=False)["chunk"].agg("\n".join)
+        assert (rebuilt == articles.set_index(["pcode", "slug"])["content"].loc[rebuilt.index]).all()
+        # 單行超過 size 才可能超過；本語料最長一行 202 字
+        assert chunks["chunk"].str.len().max() <= size
+        # 不超過 size 的條文一定整條一塊
+        short = articles.loc[articles["content"].str.len() <= size, ["pcode", "slug"]]
+        n = chunks.drop_duplicates(["pcode", "slug"]).merge(short, on=["pcode", "slug"])["n_chunks"]
+        assert (n == 1).all() and len(n) == len(short)
 
 
-BAD = [
-    ("少了時區", dict(event_time="2026-08-31T07:30:00"), "沒有時區"),
-    ("未知 event_type", dict(event_type="no_vest"), "未知 event_type"),
-    ("缺鍵", dict(worker_id=None), "worker_id 有空值"),
-    ("worker_id 是數字", dict(worker_id=41), "worker_id 不是字串"),
-    ("confidence 字串", dict(confidence="0.8"), "confidence 不是數字"),
-    ("confidence 負值", dict(confidence=-0.3), "超出 0–1"),
-    ("ingested_at 沒時區", dict(ingested_at="2026-08-31T07:54:40"), "ingested_at 沒有時區"),
-]
+def test_18_chunk_size_table_claims(d18, articles):
+    """〈參考判讀〉的比較表。"""
+    rows = {}
+    for size in (300, 450, 500):
+        c = d18["chunk_articles"](articles, size)
+        later = c[c["chunk_no"] > 1]
+        kuan = later["chunk"].str.match(r"[一二三四五六七八九十]+、")
+        mu = later["chunk"].str.match(r"（[一二三四五六七八九十]+）")
+        xiang = later["chunk"].str.match(r"(?:前|第[一二三四五六七八九十]+)\S*項")
+        rows[size] = (len(c), int((c.drop_duplicates(["pcode", "slug"])["n_chunks"] > 1).sum()),
+                      int((kuan | mu).sum()), int(kuan.sum()), int(mu.sum()), int(xiang.sum()),
+                      int(c["chunk"].str.len().max()))
+    assert rows == {300: (860, 91, 50, 40, 10, 20, 300), 450: (780, 30, 16, 15, 1, 3, 447),
+                    500: (773, 24, 12, 10, 2, 3, 500)}
 
 
-@pytest.mark.parametrize("label,change,msg", BAD, ids=[b[0] for b in BAD])
-def test_18_bad_data_blocked(d18, lines, label, change, msg):
-    with pytest.raises(d18["PipelineError"], match=msg):
-        d18["run"](d18["broken"](lines, 5, **change))
+def test_18_orphan_line_separates_kuan_mu_and_xiang():
+    """原版把款（一、）與目（（一））都算成「款」，也沒算「前項」開頭的塊：輸出必須分開列。"""
+    out = run_main(LESSON)
+    assert "16 塊以款或目開頭（款 15、目 1）" in out
+    assert "3 塊以「前項／第 N 項」開頭" in out
+    assert "塊以「款」開頭" not in out
 
 
-def test_18_conflict_vs_resend(d18, lines):
-    first = json.loads(lines[0])["event_id"]
-    with pytest.raises(d18["PipelineError"], match="不唯一"):
-        d18["run"](d18["broken"](lines, 5, event_id=first))
-    # 完全相同的重送：放行，audit 多 1 筆，只有補傳那列的說明改變
-    text, _, _, audit = d18["run"](io.StringIO("\n".join(lines + [lines[5]]) + "\n"))
-    assert audit[0]["rows"] == 21 and d18["fingerprint"](text) == "78398ed17d238166"
-    base = d18["run"](d18["DATA"] / "events.jsonl")[0].splitlines()
-    assert sum(a != b for a, b in zip(base, text.splitlines())) == 1
+def test_18_distribution_claims(articles):
+    length = articles["content"].str.len()
+    assert length.max() == 935 and length.min() == 4 and length.median() == 121
+    assert (length > 450).sum() == 30 and (length <= length.mean()).mean() > 0.6
+    p95 = length.groupby(articles["law_name"]).quantile(0.95).round()
+    assert p95["營造安全衛生設施標準"] == 524 and p95["勞工退休金條例"] == 294
+    g = length[articles["pcode"] == "N0060014"]
+    assert (g > 450).sum() == 12 and len(g) == 189
 
 
-def test_18_missing_column_and_budget(d18, lines):
-    stripped = "\n".join(json.dumps({k: v for k, v in json.loads(x).items() if k != "zone"}, ensure_ascii=False) for x in lines)
-    with pytest.raises(d18["PipelineError"], match=r"缺少欄位 \['zone'\]"):
-        d18["run"](io.StringIO(stripped + "\n"))
-    with pytest.raises(d18["PipelineError"], match="超過預算 500"):
-        d18["run"](d18["DATA"] / "events.jsonl", budget=500)
+def test_18_fixed_cut_lands_mid_line(d18, articles):
+    assert int(articles["content"].map(d18["mid_line_cuts"]).sum()) == 31
+    assert d18["mid_line_cuts"]("a" * 449 + "\n" + "b" * 100) == 0     # 剛好切在換行上不算
 
 
-def test_18_extra_checks_hook(d18, lines):
-    def no_z9(ev):
-        if (ev["zone"] == "Z9").any():
-            raise d18["PipelineError"]("Z9")
-    assert d18["fingerprint"](d18["run"](d18["DATA"] / "events.jsonl", checks=[no_z9])[0]) == FINGERPRINT
-    with pytest.raises(d18["PipelineError"], match="Z9"):
-        d18["run"](d18["broken"](lines, 5, zone="Z9"), checks=[no_z9])
+def test_18_explode_fanout_and_link(d18, articles, reports):
+    assert len(reports.explode("tags")) == 82
+    both = reports.explode("tags").explode("related_articles")
+    assert len(both) == 106 and (both["tags"] == "墜落").sum() == 16
+    assert reports["tags"].map(lambda t: "墜落" in t).sum() == 8
+    linked, no_ref = d18["link_articles"](reports, articles)
+    assert len(linked) == 42 and no_ref == 6 and linked["article_no"].notna().all()
+    # list 欄被當字串：靜默 NaN（兩版相同）
+    assert reports["related_articles"].str.split("#").isna().all()
 
 
-def test_18_small_batches_do_not_crash(d18, lines):
-    """只有 cam-08 一天：confidence 整欄 null（pandas 3 讀成 object）、只有一週、沒有未辨識。"""
-    sub = [x for x in lines if '"cam-08"' in x and "2026-08-31" in x]
-    text = d18["run"](io.StringIO("\n".join(sub) + "\n"))[0]
-    assert [json.loads(x)["kind"] for x in text.splitlines()] == ["top_worker", "top_worker"]
+def test_18_link_articles_rejects(d18, articles, reports):
+    bad = reports.copy()
+    bad.at[1, "related_articles"] = ["N0060014#999"]
+    with pytest.raises(ValueError, match="引用的條文不存在"):
+        d18["link_articles"](bad, articles)
+    bad.at[1, "related_articles"] = ["N0060014-19"]
+    with pytest.raises(ValueError, match="格式不對"):
+        d18["link_articles"](bad, articles)
 
 
-def test_18_naive_dedupe_drops_conflict_silently(d18, lines):
-    """〈參考判讀〉：AI 的 drop_duplicates('event_id') 會安靜丟掉衝突的那筆。"""
-    first = json.loads(lines[0])["event_id"]
-    df = d18["read_events"](d18["broken"](lines, 5, event_id=first))
-    assert len(df.drop_duplicates("event_id")) == 2817
+def test_18_deidentify_and_residuals(d18, reports, roster):
+    clean = d18["deidentify"](reports, roster["name"])
+    assert clean["text"].str.count("〔姓名〕").sum() == 67 and clean["text"].str.count("〔電話〕").sum() == 15
+    assert reports["text"].str.contains("〔").sum() == 0                 # 不改原表
+    found = d18["residuals"](clean, ["text", "reporter"], roster["name"])
+    assert found["text：名冊人名"] == 0 and found["text：像電話的數字"] == 0
+    assert found["text：工號"] == 7 and found["reporter：名冊人名"] == 40
 
 
-def test_18_ties_ranked_by_worker_id(d18):
-    """同分時名次由工號決定，不受輸入順序影響（kind="stable"）。"""
-    ids = [f"W{i:03d}" for i in range(30, 0, -1)]          # 倒序輸入、每人 1 筆違規
-    ev = pd.DataFrame({
-        "worker_id": ids, "is_violation": True, "week": "2026-09-21", "date": "2026-09-22",
-        "event_time": "2026-09-22T09:00:00+08:00", "event_type": "no_helmet", "conf_fixed": False, "late": False,
-    })
-    summary = d18["condense"](ev, d18["weekly"](ev), [])
-    assert summary["item"].tolist()[:3] == ["W001", "W002", "W003"]
+def test_18_reporter_outside_roster_is_visible(d18, reports, roster):
+    """X001、X002 的通報人不在名冊：名冊掃描只數到 40／42，Demo 必須把這 2 列印出來，正文不得再說「40 列全是名冊人名」。"""
+    out = run_main(LESSON)
+    assert "reporter 欄共 42 列：名冊掃描抓到 40 列，另 2 列不在名冊、掃不到：['陳志明']（X001、X002）" in out
+    assert "'reporter：名冊人名': 40" in out
+    text = (ROOT / LESSON).read_text(encoding="utf-8")
+    assert "40 列全是名冊上的人名" not in text
+    assert "陳志明" not in set(roster["name"]) and reports["reporter"].isin(roster["name"]).all()
 
 
-def test_18_dedupe_keeps_first_arrival_regardless_of_input_order():
-    """audit 說「留最先到達的一筆」：倒序輸入也必須成立。"""
+@pytest.mark.parametrize("phone", ["0900-873-763", "0912345678", "(02)2345-6789", "02-2345-6789"])
+def test_18_phone_formats(d18, roster, phone):
+    df = pd.DataFrame({"text": [f"請洽{phone}安衛室"]})
+    assert d18["deidentify"](df, roster["name"])["text"].iloc[0] == "請洽〔電話〕安衛室"
+
+
+def test_18_roster_cannot_catch_unknown_names(d18, roster, articles):
+    df = pd.DataFrame({"text": ["水電包商的張美華師傅", "李雅婷（工號 W002）"]})
+    out = d18["deidentify"](df, roster["name"])["text"].tolist()
+    assert out == ["水電包商的張美華師傅", "〔姓名〕（工號 W002）"]
+    assert "張" not in set(roster["name"].str[0])
+    guess = f"[{''.join(sorted(set(roster['name'].str[0])))}][\u4e00-\u9fff]{{2}}"
+    assert len(articles["content"].str.findall(guess).explode().dropna()) == 85
+
+
+def test_18_pack_lines_never_truncates(d18):
+    """單一行超過 size：整行成一塊，不截斷（截斷會讓「但書」消失）。"""
+    text = "短\n" + "長" * 30 + "\n尾"
+    assert d18["pack_lines"](text, 10) == ["短", "長" * 30, "尾"]
+    assert d18["pack_lines"]("甲\n乙\n丙", 3) == ["甲\n乙", "丙"]
+
+
+def test_18_roundtrip_guard(articles):
+    """chunk_articles() 的接回核對要有牙齒：換一個會掉內容的切法，必須報錯。"""
     ns = load_demo(LESSON)[2]
-    raw = pd.read_json(ROOT / "data" / "events" / "events.jsonl", lines=True, dtype=False, convert_dates=False)
-    for frame in (raw, raw.iloc[::-1]):
-        ev, _ = ns["clean"](frame)
-        kept = ev.set_index("event_id")["ingested_at"]
-        first = raw.groupby("event_id")["ingested_at"].min()
-        assert (kept.sort_index() == first.loc[kept.index].sort_index()).all()
+    ns["pack_lines"] = lambda text, size: text.split("\n")[:1]
+    with pytest.raises(ValueError, match="接不回原文"):
+        ns["chunk_articles"](articles)
+
+
+def test_18_longer_names_replaced_first(d18):
+    df = pd.DataFrame({"text": ["王明華與王明一起作業"]})
+    out = d18["deidentify"](df, ["王明", "王明華"])["text"].iloc[0]
+    assert out == "〔姓名〕與〔姓名〕一起作業"

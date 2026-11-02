@@ -1,0 +1,8 @@
+LESSON = '05-sql-or-pandas.md'
+TITLE = '選邊，並抓 AI 的錯'
+STARTER = '05_workshop_longest.py'
+CLASS = '「每部法規最長的一條有幾個字？」起手式已用 SQL 與 pandas 各算一次並比對。執行它，然後寫一句話：這題你會選哪一邊？如果資料庫是 MariaDB，SQL 版要改什麼？（提示：補充段的 `LENGTH`）'
+CLASS_ANSWER = '換成 MariaDB：`LENGTH` 回傳位元組數，要改成 `CHAR_LENGTH`，否則中文字數會變成約 3 倍。'
+EXTENSION = '\n\n1. 在 SQL 和 pandas 各做一次「每部法規、每一章各幾條」，章名用 `NULLIF(chapter, \'\')`。比較兩邊的列數與總條數。\n2. 請 OpenCode 寫「`search(con, pcode, keyword)`：從 `law_articles` 找某部法規裡含關鍵字的條文，回傳 DataFrame」，拿它的程式驗收：\n\n| 檢查 | 正確答案 | AI 的版本 |\n| --- | --- | --- |\n| 第四段三種輸入各呼叫一次 | 15／0／0 列 | |\n| 先篩再拉，還是 `SELECT *` 全拉？傳回幾欄？ | 先篩再拉，只回需要的欄 | |\n| `LIKE` 的 `%` 寫在哪裡？換到 MariaDB 還成立嗎？ | 寫在值裡；成立 | |\n| 傳入 `keyword="%"` 回幾列？ | 189（參數化不處理萬用字元） | |'
+ACCEPT = '- 起手式兩邊 `equals` 為 True，並寫下選邊的理由。\n- 能說出 MariaDB 版要把 `LENGTH` 改成 `CHAR_LENGTH`。\n- （延伸）`NULL` 那一組在 SQL 與 pandas 的差別說得出來；AI 驗收表四列都有結論。'
+STARTER_CODE = '"""第 05 節 Workshop 課堂題：「每部法規最長的一條有幾個字？」SQL 算一次、pandas 算一次，再比對。"""\n\nfrom importlib import import_module\n\nimport pandas as pd\n\ndemo = import_module("05_sql_or_pandas")   # 檔名以數字開頭，改用 import_module 匯入\n\nif __name__ == "__main__":\n    articles = pd.read_json(demo.DATA / "articles.jsonl", lines=True, dtype=False, convert_dates=False)\n    con = demo.build_db(articles)\n\n    in_sql = pd.read_sql("SELECT pcode, MAX(LENGTH(content)) AS n FROM law_articles "\n                         "GROUP BY pcode ORDER BY pcode", con)\n\n    pulled = pd.read_sql("SELECT pcode, content FROM law_articles", con)\n    in_pandas = (pulled.assign(n=pulled["content"].str.len())\n                 .groupby("pcode")["n"].max().reset_index())\n\n    print(in_sql.to_string(index=False))\n    print(f"兩邊 equals：{in_sql.equals(in_pandas)}")\n'
